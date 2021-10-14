@@ -28,7 +28,7 @@ If its an Array (IsArray will be true) you can index through the JToken items of
 # JObject
 If its an Object (IsObject will be true) you can look up a object property array["name"] syntax to return a JToken.  You can also use a foreach loop on it to return key/value pairs.  You can find the list of property names using ProperyNames(). First, FirstOrDefault, Last, LastOrDefault is provided.  Contains and TryGetValue allow you to test to see if a property is present.  Add, Remove, Clear is provided.
 
-# JSON Gets
+# Gets
 The functions in QuickJSONGets allow you to safely convert JToken items to various types, all while not excepting. This is useful for reading external data which may have missing fields, or clashing types. You can specify a default value to use if the JToken does not read correctly.  An example is token.Str("default value").
 
 It also contains static string extensions for JSONParse, and rename functions for JTokens.  A .Object() and .Array() exists which converts the JToken to the respective types, or returns null.
