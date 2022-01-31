@@ -6,7 +6,9 @@ Aim is to be
 2) Be simple to understand - no spagetti of classes
 3) Be small with only a few files - so you can copy the code into your codebase and not have to have yet another dependent DLL to go along with your deployment
 
-Download the .sln and you can build the test hardness to verify use
+Download the .sln and you can build the test hardness to verify use.
+
+Check out the [Wiki](../../wiki) for help.  The full class list is [here](../../wiki/QuickJSON-Class-List)
 
 # JToken
 
