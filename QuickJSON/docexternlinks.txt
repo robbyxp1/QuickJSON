@@ -1,2 +1,2 @@
-https://www.khronos.org/registry/OpenGL-Refpages/gl4/
+https://www.example.org/registry/OpenGL-Refpages/gl4/
 T:OpenTK.Graphics.OpenGL4.BufferUsageHint|html/glBufferData.xhtml

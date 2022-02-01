@@ -17,6 +17,7 @@
 using NFluent;
 using NUnit.Framework;
 using QuickJSON;
+using QuickJSON.FluentFormatter;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -72,7 +73,7 @@ namespace JSONTests
 
                 //   string json = "{ \"timestamp\":\"2016-09-27T19:43:21Z\", \"event\":\"Fileheader\", \"part\":1, \"language\":\"English\\\\UK\", \"gameversion\":\"2.2 (Beta 3)\", \"build\":\"r121970/r0 \" }";
 
-                JToken decoded = JToken.Parse(json);
+                JToken decoded = JToken.Parse(json, out string errortext);
                 Check.That(decoded).IsNotNull();
                 string outstr = decoded.ToString(true);
                 System.Diagnostics.Debug.WriteLine("" + outstr);
@@ -166,7 +167,7 @@ namespace JSONTests
                     Check.That(jo).IsNotNull();
                     var ja = JArray.Parse(js);
                     Check.That(ja).IsNull();
-                    var jb = JArray.Parse(js,JToken.ParseOptions.ThrowOnError);
+                    var jb = JArray.Parse(js, JToken.ParseOptions.ThrowOnError);
                 }
                 catch (Exception ex)
                 {
@@ -1520,5 +1521,27 @@ namespace JSONTests
             }
         }
 
+        [Test]
+        public void JSONFluent()
+        {
+            {
+                var f1 = new JSONFormatter();
+                f1.Object();
+                f1.V("a", 1);
+                f1.V("b", 2);
+                string sa1 = f1.Get();
+                Check.That(sa1).Equals(@"{ ""a"":1, ""b"":2 }");
+            }
+            {
+                var f1 = new JSONFormatter();
+                f1.Array();
+                f1.V(1);
+                f1.V(2);
+                string sa1 = f1.Get();
+                Check.That(sa1).Equals(@"[ 1, 2 ]");
+            }
+
+
+        }
     }
 }

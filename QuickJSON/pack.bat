@@ -1,12 +1,3 @@
-rem pack removes all bin/obj, removes previous nupkg and .zip, then rebuilds
-rem creates a .zip copy so you can check it manually - important
-
-delete -confirm *.nupkg *.zip
-delete -confirm /rp bin
-delete -confirm /rp obj
-
-nuget pack QuickJSON.csproj -Verbosity detailed -Build -Properties Configuration=Release
-
-copy *.nupkg *.zip
-
-copy *.nupkg ..\..\examples\packages
+rem https://docs.microsoft.com/en-us/nuget/quickstart/create-and-publish-a-package-using-visual-studio?tabs=netcore-cli
+rem this is a SDK project, right click on QuickJSON when in release build and Pack
+copy bin\release\*.nupkg \code\examples\packages
