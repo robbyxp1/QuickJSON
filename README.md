@@ -71,6 +71,10 @@ Dates are stored in JToken as strings. When an c# object (FromObject) is convert
 
 The files QuickJSONDeepEquals, ..FromObject, ..ToObject, ..TokenReader, .. Gets, ..ObjectFilter, StringParserTextReader are all optional for a simple string read and write JSON converter.
 
+## Fluent Formatter
+
+A simple Fluent Formatter, JSONFormatter is also present. This can construct JSON strings quickly and easily using a fluent format.
+
 ## Tests
 
 The NUnit test DLL has plenty of examples of how to use the above functions.  See JSONTests.cs. Note it expects a folder called c:\code which is available for writing.
