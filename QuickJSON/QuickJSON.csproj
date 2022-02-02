@@ -26,6 +26,7 @@ Designed for speed and compactness.
 Code can be XCOPYED into your project to avoid DLL dependencies.</Description>
     <Copyright>(C) robbyxp @ gihub.com</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>0.9.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net5.0|AnyCPU'">
