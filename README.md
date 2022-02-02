@@ -1,8 +1,8 @@
 ## QuickJSON
 QuickJSON - a c# JSON encoder/decoder - Small, simple, quick
 
-Aim is to be 
-1) Quicker than the JSON decoder commonly used in C# 
+Aim is to be
+1) Quicker than the JSON decoder commonly used in C#
 2) Be simple to understand - no spagetti of classes
 3) Be small with only a few files - so you can copy the code into your codebase and not have to have yet another dependent DLL to go along with your deployment
 
@@ -37,7 +37,7 @@ It also contains static string extensions for JSONParse, and rename functions fo
 
 ## Parsing
 
-The JToken Parse functions allow you to turn a JSON string representation into a QuickJSON JToken structure of all the elements in the data.  Many different Parse functions exist in QuickJsonParse.cs file, which either throw an exception, or return a null. 
+The JToken Parse functions allow you to turn a JSON string representation into a QuickJSON JToken structure of all the elements in the data.  Many different Parse functions exist in QuickJsonParse.cs file, which either throw an exception, or return a null.
 
 ## ToString
 
@@ -49,7 +49,7 @@ The ToObject functions (QuickJSONToObject.cs) allow conversion of a JToken struc
 
 ## FromObject
 
-The FromObject functions (QuickJSONFromObject.cs) allow conversion of a object to a JToken structure.  The custom attribute JsonNameAttribute can be used as above (only the first name is used). The custom attribute JsonIgnore allows you to specify this member should not go into the JSON.
+The FromObject functions (QuickJSONFromObject.cs) allow conversion of a object to a JToken structure.  The custom attribute JsonNameAttribute can be used as above. The custom attribute JsonIgnore allows you to specify this member should not go into the JSON.
 
 ## DeepEquals
 
@@ -69,7 +69,7 @@ Dates are stored in JToken as strings. When an c# object (FromObject) is convert
 
 ## Optional Files
 
-The files QuickJSONDeepEquals, ..FromObject, ..ToObject, ..TokenReader, .. Gets, ..ObjectFilter, StringParserTextReader are all optional for a simple string read and write JSON converter.
+The files QuickJSONDeepEquals, ..FromObject, ..ToObject, ..TokenReader, .. Gets, ..ObjectFilter, StringParserTextReader, JSONFluentFormatter are all optional for a simple string read and write JSON converter.
 
 ## Fluent Formatter
 

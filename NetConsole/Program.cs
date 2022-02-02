@@ -1,28 +1,30 @@
 ﻿using System;
 using QuickJSON;
-using QuickJSON.FluentFormatter;
 
 namespace NetConsole
 {
     class Program
     {
-        // demonstrate .net QuickJSON
-        // the tests are build in 4.8 so demo those
-
+        // demonstrate .net 5 QuickJSON
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            {
+                var f1 = new JSONFormatter();
+                f1.Object();
+                f1.V("a", 1);
+                f1.V("b", 2);
+                string sa1 = f1.Get();
+                Console.WriteLine(sa1);
+            }
+            {
+                var f1 = new JSONFormatter();
+                f1.Array();
+                f1.V(1);
+                f1.V(2);
+                string sa1 = f1.Get();
+                Console.WriteLine(sa1);
+            }
 
-            JObject jo = new JObject { ["one"] = 1, ["two"] = 2 };
-            Console.WriteLine(jo.ToString(true));
-
-
-            string s = (new JSONFormatter()).Object().V("a", 1).V("b", 2).Get();
-            var f1 = (new JSONFormatter());
-            f1.Object();
-            f1.V("a", 1);
-            f1.V(2);
-            string sa1 = f1.Get();
         }
     }
 }

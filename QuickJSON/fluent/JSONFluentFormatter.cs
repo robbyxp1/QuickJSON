@@ -19,13 +19,13 @@ using System.Collections.Generic;
 using System.Linq;
 using QuickJSON.Utils;
 
-namespace QuickJSON.FluentFormatter
+namespace QuickJSON
 {
     /// <summary>
     /// Quick formatter using Fluent syntax, quick and easy way to make a JSON string
     /// </summary>
 
-    public class JSONFormatter        
+    public class JSONFormatter
     {
         /// <summary> QuickJSONFormatter Error exception</summary>
         public class FormatterException : Exception
@@ -49,7 +49,7 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add a property called name with string data</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name
         /// </exception>
         public JSONFormatter V(string name, string data)
         {
@@ -57,11 +57,12 @@ namespace QuickJSON.FluentFormatter
             if (name != null)
                 json += "\"" + name + "\":";
             json += "\"" + data + "\"";
+            System.Diagnostics.Debug.WriteLine($"String: `{json}`");
             return this;
         }
 
         /// <summary> Add an array element with string data</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an object or start because of no property name
+        /// <exception cref="FormatterException">Thrown if adding to an object because of no property name or if first element added
         /// </exception>
         public JSONFormatter V(string data)
         {
@@ -69,7 +70,7 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add a property called name with a double value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name
         /// </exception>
         public JSONFormatter V(string name, double value)
         {
@@ -81,7 +82,7 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add an array element with a double value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an object or start because of no property name
+        /// <exception cref="FormatterException">Thrown if adding to an object because of no property name or if first element added
         /// </exception>
         public JSONFormatter V(double value)
         {
@@ -89,7 +90,7 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add a property called name with int value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <exception cref="FormatterException">Thrown if adding to an array with a property name or if first element added
         /// </exception>
         public JSONFormatter V(string name, int value)
         {
@@ -97,11 +98,12 @@ namespace QuickJSON.FluentFormatter
             if (name != null)
                 json += "\"" + name + "\":";
             json += value.ToStringInvariant();
+            System.Diagnostics.Debug.WriteLine($"Int: `{json}`");
             return this;
         }
 
         /// <summary> Add an array element with int value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an object or start because of no property name
+        /// <exception cref="FormatterException">Thrown if adding to an object because of no property name or if first element added
         /// </exception>
         public JSONFormatter V(int value)
         {
@@ -109,7 +111,7 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add a property called name with long value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name
         /// </exception>
         public JSONFormatter V(string name, long value)
         {
@@ -121,7 +123,7 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add an array element with long value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an object or start because of no property name
+        /// <exception cref="FormatterException">Thrown if adding to an object because of no property name or if first element added
         /// </exception>
         public JSONFormatter V(long value)
         {
@@ -129,19 +131,19 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add a property called name with bool value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name
         /// </exception>
         public JSONFormatter V(string name, bool value)
         {
             Prefix(name != null);
             if (name != null)
                 json += "\"" + name + "\":";
-            json += (value ? "true" : "false");
+            json += value ? "true" : "false";
             return this;
         }
 
         /// <summary> Add an array element with bool value</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an object or start because of no property name
+        /// <exception cref="FormatterException">Thrown if adding to an object because of no property name or if first element added
         /// </exception>
         public JSONFormatter V(bool value)
         {
@@ -149,7 +151,7 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add a property called name with a DateTime value formatted in Zulu time</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name
         /// </exception>
         public JSONFormatter V(string name, DateTime value)
         {
@@ -161,50 +163,50 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Add an array element with a DateTime value formatted in Zulu time</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an object or start because of no property name
+        /// <exception cref="FormatterException">Thrown if adding to an object because of no property name or if first element added
         /// </exception>
         public JSONFormatter V(DateTime value)
         {
             return V(null, value);
         }
 
-        /// <summary> Start an array, either unnamed (at start or in array) or with property name</summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <summary> Start an array, either unnamed (at start or in array) or with property name when in object</summary>
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name, or if adding to an object without a property name
         /// </exception>
-        public JSONFormatter Array(string name = null)        
+        public JSONFormatter Array(string name = null)
         {
             Prefix(name != null);
-            if ( name != null)
+            if (name != null)
                 json += "\"" + name + "\": [ ";
             else
                 json += "[ ";
 
             stack.Add(new StackEntry(StackType.Array, precomma));
             precomma = false;
+            System.Diagnostics.Debug.WriteLine($"Array: `{json}`");
             return this;
         }
 
         /// <summary> Start an object, either unnamed (at start or in array) or property name </summary>
-        /// <exception cref="QuickJSON.FluentFormatter.JSONFormatter.FormatterException">Thrown if adding to an array or start with a property name
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name, or if adding to an object without a property name
         /// </exception>
-        public JSONFormatter Object(string name = null)                  // call, add elements, call close
+        public JSONFormatter Object(string name = null)
         {
-            Prefix(name!= null);
-            if ( name != null )
+            Prefix(name != null);
+            if (name != null)
                 json += "\"" + name + "\":{ ";
-
-            json += "{ ";
-            var se = new StackEntry(StackType.Object, precomma);
-            stack.Add(se);
-            System.Diagnostics.Debug.Assert(stack.Count > 0);
+            else
+                json += "{ ";
+            stack.Add(new StackEntry(StackType.Object, precomma));
             precomma = false;
+            System.Diagnostics.Debug.WriteLine($"Object: `{json}`");
             return this;
         }
 
-        /// <summary> Close the current array, object. Can close multiple levels if depth>0 </summary>
-        public JSONFormatter Close( int depth = 1 )    // close one of more Arrays/Objects
+        /// <summary> Close the current array, object. Can close multiple levels if depth is greater than one </summary>
+        public JSONFormatter Close(int depth = 1)
         {
-            while (depth-- > 0 && stack.Count > 0 )
+            while (depth-- > 0 && stack.Count > 0)
             {
                 StackEntry e = stack.Last();
 
@@ -217,6 +219,8 @@ namespace QuickJSON.FluentFormatter
                 stack.RemoveAt(stack.Count - 1);
             }
 
+            System.Diagnostics.Debug.WriteLine($"Close: `{json}`");
+
             return this;
         }
 
@@ -228,17 +232,14 @@ namespace QuickJSON.FluentFormatter
         }
 
         /// <summary> Close the JSON stream and return the JSON string representation</summary>
-        public string Get()                                 
+        public string Get()
         {
             Close(int.MaxValue);
             return json.Trim();
         }
 
-        /// <summary> Close the JSON stream and return the JSON string representation</summary>
-        public override string ToString()
-        {
-            return Get();
-        }
+        /// <summary> For debugging purposes, return current text state. Use Get() to properly close and get the text </summary>
+        public string CurrentText { get { return json; } }
 
         private enum StackType { Array, Object };
         private class StackEntry
@@ -256,7 +257,7 @@ namespace QuickJSON.FluentFormatter
 
         private void Prefix(bool named)
         {
-            if ( named )
+            if (named)
             {
                 if (stack.Count == 0)
                     throw new FormatterException("Can't start JSON with a property name");
@@ -265,7 +266,7 @@ namespace QuickJSON.FluentFormatter
             }
             else
             {
-                if (stack.Count >0 && stack.Last().stacktype == StackType.Object)
+                if (stack.Count > 0 && stack.Last().stacktype == StackType.Object)
                 {
                     throw new FormatterException("Property name is required in an object");
                 }

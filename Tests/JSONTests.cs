@@ -17,7 +17,6 @@
 using NFluent;
 using NUnit.Framework;
 using QuickJSON;
-using QuickJSON.FluentFormatter;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -1541,6 +1540,20 @@ namespace JSONTests
                 Check.That(sa1).Equals(@"[ 1, 2 ]");
             }
 
+            {
+                var f1 = new JSONFormatter();
+                f1.Array();
+                f1.Object();
+                f1.V("one", 1);
+                f1.V("two", 2);
+                f1.Object("three");
+                f1.V("threeone", "A");
+                f1.V("threetwo", "B");
+                f1.Close();
+                f1.V("four", 4);
+                string sa1 = f1.Get();
+                Check.That(sa1).Equals(@"[ { ""one"":1, ""two"":2, ""three"":{ ""threeone"":""A"", ""threetwo"":""B"" }, ""four"":4 } ]");
+            }
 
         }
     }
