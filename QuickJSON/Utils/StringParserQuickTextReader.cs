@@ -12,35 +12,33 @@
  * governing permissions and limitations under the License.
  */
 
-#pragma warning disable 1591
-
 using System;
 using System.IO;
 using System.Linq;
 
 namespace QuickJSON.Utils
 {
-    // uses a text reader to feed in data so string parser is unlimited in length
+    /// <summary>
+    /// Text Reader Parser Quick for JSON system.  
+    /// </summary>
 
     [System.Diagnostics.DebuggerDisplay("Action {new string(line,pos,line.Length-pos)} : ({new string(line,0,line.Length)})")]
     public class StringParserQuickTextReader : IStringParserQuick
     {
-        // ensure chunksize is big enough to read the longest number
-
-        public StringParserQuickTextReader(TextReader t, int chunksize)
+        /// <summary>Constructor </summary>
+        /// <param name="textreader">Textreader to read from</param>
+        /// <param name="chunksize">Chunk size to take each time from textreader. Make sure its big enough to read the longest number</param>
+        public StringParserQuickTextReader(TextReader textreader, int chunksize)
         {
-            tr = t;
+            tr = textreader;
             line = new char[chunksize];
         }
-
+        
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.Position"/>
         public int Position { get { return pos; } }
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.Line"/>
         public string Line { get { return new string(line, 0, length); } }
-
-        private TextReader tr;
-        private char[] line;
-        private int length = 0;
-        private int pos = 0;
-
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsEOL"/>
         public bool IsEOL()
         {
             if (pos < length)       // if we have data, its not eol
@@ -49,6 +47,7 @@ namespace QuickJSON.Utils
                 return !Reload();   // else reload. reload returns true if okay, so its inverted for EOL
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.GetChar"/>
         public char GetChar()
         {
             if (pos < length)
@@ -60,6 +59,7 @@ namespace QuickJSON.Utils
             }
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.PeekChar"/>
         public char PeekChar()
         {
             if (pos < length)
@@ -71,6 +71,7 @@ namespace QuickJSON.Utils
             }
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.SkipSpace"/>
         public void SkipSpace()
         {
             while (pos < length && char.IsWhiteSpace(line[pos]))        // first skip what we have
@@ -85,6 +86,7 @@ namespace QuickJSON.Utils
             }
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsStringMoveOn(string)"/>
         public bool IsStringMoveOn(string s)
         {
             if (pos > length - s.Length)            // if not enough to cover s, reload
@@ -105,6 +107,7 @@ namespace QuickJSON.Utils
             return true;
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsCharMoveOn(char, bool)"/>
         public bool IsCharMoveOn(char t, bool skipspace = true)
         {
             if (pos == length)                          // if at end, reload
@@ -121,11 +124,13 @@ namespace QuickJSON.Utils
                 return false;
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.BackUp"/>
         public void BackUp()
         {
             pos--;
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextQuotedString(char, char[], bool)"/>
         public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false)
         {
             int bpos = 0;
@@ -214,6 +219,7 @@ namespace QuickJSON.Utils
 
         static char[] decchars = new char[] { '.', 'e', 'E', '+', '-' };
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.JNextNumber(bool)"/>
         public JToken JNextNumber(bool sign)     // must be on a digit
         {
             ulong ulv = 0;
@@ -346,5 +352,9 @@ namespace QuickJSON.Utils
             return length > 0;
         }
 
+        private TextReader tr;
+        private char[] line;
+        private int length = 0;
+        private int pos = 0;
     }
 }

@@ -12,23 +12,21 @@
  * governing permissions and limitations under the License.
  */
 
-#pragma warning disable 1591
-
 using System;
 using System.Linq;
 
 namespace QuickJSON.Utils
 {
-    // Quicker version of StringParser.
+    /// <summary>
+    /// String Parser Quick for JSON system.
+    /// </summary>
 
     [System.Diagnostics.DebuggerDisplay("Action {new string(line,pos,line.Length-pos)} : ({new string(line,0,line.Length)})")]
     public class StringParserQuick : IStringParserQuick
     {
-        private int pos;        // always left after an operation on the next non space char
-        private char[] line;
-
         #region Init and basic status
 
+        /// <summary> Construct with line and optional position </summary>
         public StringParserQuick(string l, int p = 0)
         {
             line = l.ToCharArray();
@@ -36,33 +34,39 @@ namespace QuickJSON.Utils
             SkipSpace();
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.Position"/>
         public int Position { get { return pos; } }
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.Line"/>
         public string Line { get { return new string(line,0,line.Length); } }
-
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsEOL"/>
         public bool IsEOL() { return pos == line.Length; }
-
+        /// <summary> Return number of character left</summary>
         public int Left { get { return Math.Max(line.Length - pos,0); } }
 
         #endregion
 
         #region Character or String related functions
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.SkipSpace"/>
         public void SkipSpace()
         {
             while (pos < line.Length && char.IsWhiteSpace(line[pos]))
                 pos++;
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.PeekChar"/>
         public char PeekChar()
         {
             return (pos < line.Length) ? line[pos] : ' ';
         }
 
-        public char GetChar()       // minvalue if at EOL.. Default no skip for backwards compat
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.GetChar"/>
+        public char GetChar()      
         {
             return (pos < line.Length) ? line[pos++] : ' ';
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsStringMoveOn(string)"/>
         public bool IsStringMoveOn(string s)
         {
             for( int i = 0; i < s.Length; i++)
@@ -77,6 +81,7 @@ namespace QuickJSON.Utils
             return true;
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsCharMoveOn(char, bool)"/>
         public bool IsCharMoveOn(char t, bool skipspace = true)
         {
             if (pos < line.Length && line[pos] == t)
@@ -90,6 +95,7 @@ namespace QuickJSON.Utils
                 return false;
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.BackUp"/>
         public void BackUp()
         {
             pos--;
@@ -101,6 +107,7 @@ namespace QuickJSON.Utils
 
         // Your on a " or ' quoted string, extract it.. You supply the buffer to read into, it returns no of chars read into it, -1 if error
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextQuotedString(char, char[], bool)"/>
         public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false)
         {
             int bpos = 0;
@@ -182,6 +189,7 @@ namespace QuickJSON.Utils
 
         static char[] decchars = new char[] { '.', 'e', 'E', '+', '-' };
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.JNextNumber(bool)"/>
         public JToken JNextNumber(bool sign)     // must be on a digit
         {
             ulong ulv = 0;
@@ -269,7 +277,10 @@ namespace QuickJSON.Utils
             }
         }
 
-#endregion
+        #endregion
+
+        private int pos;        // always left after an operation on the next non space char
+        private char[] line;
 
     }
 }

@@ -18,10 +18,6 @@ using System.Collections.Generic;
 
 namespace QuickJSON
 {
-    /// <summary>
-    /// Json Object filter - allows a clone of an object with filtering
-    /// </summary>
-
     public partial class JObject : JToken, IEnumerable<KeyValuePair<string, JToken>>
     {
 

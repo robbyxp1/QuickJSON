@@ -22,8 +22,10 @@ using System.Linq;
 
 namespace QuickJSON
 {
-    // small light JSON decoder and encoder.
-    // Object class, holds key/value pairs
+
+    /// <summary>
+    /// JSON Object, holding a list of JSON JTokens referenced by property names
+    /// </summary>
 
     public partial class JObject : JToken, IEnumerable<KeyValuePair<string, JToken>>
     {

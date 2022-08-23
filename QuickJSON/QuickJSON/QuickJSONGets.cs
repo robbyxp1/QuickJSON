@@ -55,7 +55,7 @@ namespace QuickJSON
             return token != null ? (string)token : null;
         }
 
-        /// <summary> Return the enumeration of T from a JToken Long representation of the value of the enumeration. Return def if token is null or not a long</summary>
+        /// <summary> Return the enumeration of T from a JToken Long representation of the value of the enumeration. Return def if token is not present, null or not a long</summary>
         /// <typeparam name="T">Enumeration type to use</typeparam>
         public static T Enum<T>(this JToken token, T def)      
         {
@@ -68,7 +68,7 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return the enumeration of T from a JToken string representation of the value of the enumeration. Return def if token is null or not a string.</summary>
+        /// <summary> Return the enumeration of T from a JToken string representation of the value of the enumeration. Return def if token is not present, null or not a string.</summary>
         /// <typeparam name="T">Enumeration type to use</typeparam>
         public static T EnumStr<T>(this JToken token, T def, bool ignorecase = true) where T:struct    
         {
@@ -84,7 +84,7 @@ namespace QuickJSON
             return def;
         }
 
-        /// <summary> Return an integer. Return def if token is not a number or null</summary>
+        /// <summary> Return an integer. Return def if token is not present, not a number or null</summary>
         public static int Int(this JToken token, int def = 0)
         {
             if (token != null)
@@ -93,13 +93,13 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return an integer. Return null if token is not a number or null</summary>
+        /// <summary> Return an integer. Return null if token is not present, not a number or null</summary>
         public static int? IntNull(this JToken token)
         {
             return token != null ? (int?)token : null;
         }
 
-        /// <summary> Return an unsigned integer. Return def if token is not a number or null</summary>
+        /// <summary> Return an unsigned integer. Return def if token is not present, not a number or null</summary>
         public static uint UInt(this JToken token, uint def = 0)
         {
             if (token != null)
@@ -108,13 +108,13 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return an unsigned integer. Return null if token is not a number or null</summary>
+        /// <summary> Return an unsigned integer. Return null if token is not present, not a number or null</summary>
         public static uint? UIntNull(this JToken token)
         {
             return token != null ? (uint?)token : null;
         }
 
-        /// <summary> Return a long. Return def if token is not a number or null</summary>
+        /// <summary> Return a long. Return def if token is not present, not a number or null</summary>
         public static long Long(this JToken token, long def = 0)
         {
             if (token != null)
@@ -123,13 +123,13 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return a long. Return null if token is not a number or null</summary>
+        /// <summary> Return a long. Return null if token is not present, not a number or null</summary>
         public static long? LongNull(this JToken token)
         {
             return token != null ? (long?)token : null;
         }
 
-        /// <summary> Return an unsigned long. Return def if token is not a number or null</summary>
+        /// <summary> Return an unsigned long. Return def if token is not present, not a number or null</summary>
         public static ulong ULong(this JToken token, ulong def = 0)
         {
             if (token != null)
@@ -138,13 +138,13 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return an unsigned long. Return null if token is not a number or null</summary>
+        /// <summary> Return an unsigned long. Return null if token is not present, not a number or null</summary>
         public static ulong? ULongNull(this JToken token)
         {
             return token != null ? (ulong?)token : null;
         }
 
-        /// <summary> Return a double. Return def if token is not a number or null</summary>
+        /// <summary> Return a double. Return def if token is not present, not a number or null</summary>
         public static double Double(this JToken token, double def = 0)
         {
             if (token != null)
@@ -153,13 +153,26 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return a double. Return null if token is not a number or null</summary>
+        /// <summary> Return a float with scaling. Return def if token is not present, not a number or null.</summary>
+        public static double Double(this JToken token, double scale, double def)
+        {
+            if (token != null)
+            {
+                double? v = (double?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+            return def;
+        }
+
+
+        /// <summary> Return a double. Return null if token is not present, not a number or null</summary>
         public static double? DoubleNull(this JToken token)
         {
             return token != null ? (double?)token : null;
         }
 
-        /// <summary> Return a float. Return def if token is not a number or null</summary>
+        /// <summary> Return a float. Return def if token is not present, not a number or null</summary>
         public static float Float(this JToken token, float def = 0)
         {
             if (token != null)
@@ -168,14 +181,27 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return a float. Return null if token is not a number or null</summary>
+        /// <summary> Return a float with scaling. Return def if token is not present, not a number or null.</summary>
+        public static float Float(this JToken token, float scale, float def)
+        {
+            if (token != null)
+            {
+                float? v = (float?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+
+            return def;
+        }
+
+        /// <summary> Return a float. Return null if token is not present, not a number or null</summary>
         public static float? FloatNull(this JToken token)
         {
             return token != null ? (float?)token : null;
         }
 
 #if JSONBIGINT
-        /// <summary> Return a Big Integer. Return def if token is not a number or null</summary>
+        /// <summary> Return a Big Integer. Return def if token is not present, not a number or null</summary>
         public static System.Numerics.BigInteger BigInteger(this JToken token, System.Numerics.BigInteger def)
         {
             if (token == null)
@@ -191,7 +217,7 @@ namespace QuickJSON
         }
 #endif
 
-        /// <summary> Return a bool. Return def if token is not a number or null</summary>
+        /// <summary> Return a bool. Return def if token is not present, not a number or null</summary>
         public static bool Bool(this JToken token, bool def = false)
         {
             if ( token != null )
@@ -200,7 +226,7 @@ namespace QuickJSON
                 return def;
         }
 
-        /// <summary> Return an integer. Return null if token is not a number or null</summary>
+        /// <summary> Return an integer. Return null if token is not present, not a number or null</summary>
         public static bool? BoolNull(this JToken token)
         {
             return token != null ? (bool?)token : null;

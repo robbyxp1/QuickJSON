@@ -175,6 +175,40 @@ namespace JSONTests
 
                 }
             }
+
+            {
+                string js = "{ \"t\":20.2 }";
+                var jo = JObject.Parse(js, JToken.ParseOptions.ThrowOnError);
+                Check.That(jo).IsNotNull();
+                double t1 = jo["t"].Double();
+                Check.That(t1).Equals(20.2);
+                double? t2 = jo["t2"].DoubleNull();
+                Check.That(t2).IsNull();
+                double t3 = jo["t2"].Double(30);
+                Check.That(t3).Equals(30);
+                double t4 = jo["t"].Double(4, 20);
+                Check.That(t4).Equals(80.8);
+                double t5 = jo["t2"].Double(4, 20);
+                Check.That(t5).Equals(20);
+
+            }
+
+            {
+                string js = "{ \"t\":20.2 }";
+                var jo = JObject.Parse(js, JToken.ParseOptions.ThrowOnError);
+                Check.That(jo).IsNotNull();
+                float t1 = jo["t"].Float();
+                Check.That(t1).Equals(20.2f);
+                float? t2 = jo["t2"].FloatNull();
+                Check.That(t2).IsNull();
+                float t3 = jo["t2"].Float(30);
+                Check.That(t3).Equals(30f);
+                float t4 = jo["t"].Float(4, 20);
+                Check.That(t4).Equals(80.8f);
+                float t5 = jo["t2"].Float(4, 20);
+                Check.That(t5).Equals(20f);
+
+            }
         }
 
 
@@ -1523,37 +1557,37 @@ namespace JSONTests
         [Test]
         public void JSONFluent()
         {
-            {
-                var f1 = new JSONFormatter();
-                f1.Object();
-                f1.V("a", 1);
-                f1.V("b", 2);
-                string sa1 = f1.Get();
-                Check.That(sa1).Equals(@"{ ""a"":1, ""b"":2 }");
-            }
-            {
-                var f1 = new JSONFormatter();
-                f1.Array();
-                f1.V(1);
-                f1.V(2);
-                string sa1 = f1.Get();
-                Check.That(sa1).Equals(@"[ 1, 2 ]");
-            }
+            //{
+            //    var f1 = new JSONFormatter();
+            //    f1.Object();
+            //    f1.V("a", 1);
+            //    f1.V("b", 2);
+            //    string sa1 = f1.Get();
+            //    Check.That(sa1).Equals(@"{ ""a"":1, ""b"":2 }");
+            //}
+            //{
+            //    var f1 = new JSONFormatter();
+            //    f1.Array();
+            //    f1.V(1);
+            //    f1.V(2);
+            //    string sa1 = f1.Get();
+            //    Check.That(sa1).Equals(@"[ 1, 2 ]");
+            //}
 
-            {
-                var f1 = new JSONFormatter();
-                f1.Array();
-                f1.Object();
-                f1.V("one", 1);
-                f1.V("two", 2);
-                f1.Object("three");
-                f1.V("threeone", "A");
-                f1.V("threetwo", "B");
-                f1.Close();
-                f1.V("four", 4);
-                string sa1 = f1.Get();
-                Check.That(sa1).Equals(@"[ { ""one"":1, ""two"":2, ""three"":{ ""threeone"":""A"", ""threetwo"":""B"" }, ""four"":4 } ]");
-            }
+            //{
+            //    var f1 = new JSONFormatter();
+            //    f1.Array();
+            //    f1.Object();
+            //    f1.V("one", 1);
+            //    f1.V("two", 2);
+            //    f1.Object("three");
+            //    f1.V("threeone", "A");
+            //    f1.V("threetwo", "B");
+            //    f1.Close();
+            //    f1.V("four", 4);
+            //    string sa1 = f1.Get();
+            //    Check.That(sa1).Equals(@"[ { ""one"":1, ""two"":2, ""three"":{ ""threeone"":""A"", ""threetwo"":""B"" }, ""four"":4 } ]");
+            //}
 
         }
     }
