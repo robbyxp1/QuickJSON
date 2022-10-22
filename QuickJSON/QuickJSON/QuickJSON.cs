@@ -482,13 +482,13 @@ namespace QuickJSON
                 throw new InvalidOperationException();
         }
 
-        /// <summary> Explicit conversion of a JSON Token String to a date. Return MinValue if JToken is not of the right type or date conversion fails</summary>
+        /// <summary> Explicit conversion of a JSON Token String to a date, assuming UTC. Return MinValue if JToken is not of the right type or date conversion fails</summary>
         public static explicit operator DateTime(JToken t)
         {
             if (t.IsString && System.DateTime.TryParse((string)t.Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
                 return ret;
             else
-                return DateTime.MinValue;
+                return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
         }
 
         /// <summary> Is this token equal to another tokens value. Only for object types of string, int, uint, long, ulong, bool </summary>

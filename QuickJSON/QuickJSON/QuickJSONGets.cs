@@ -172,6 +172,18 @@ namespace QuickJSON
             return token != null ? (double?)token : null;
         }
 
+        /// <summary> Return a double with scaling. Return null if token is not present, not a number or null</summary>
+        public static double? DoubleNull(this JToken token, double scale)
+        {
+            if ( token != null )
+            {
+                double? v = (double?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+            return null;
+        }
+
         /// <summary> Return a float. Return def if token is not present, not a number or null</summary>
         public static float Float(this JToken token, float def = 0)
         {
@@ -198,6 +210,19 @@ namespace QuickJSON
         public static float? FloatNull(this JToken token)
         {
             return token != null ? (float?)token : null;
+        }
+
+        /// <summary> Return a float with scale. Return null if token is not present, not a number or null</summary>
+        public static float? FloatNull(this JToken token, float scale)
+        {
+            if (token != null)
+            {
+                float? v = (float?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+
+            return null;
         }
 
 #if JSONBIGINT
@@ -261,13 +286,13 @@ namespace QuickJSON
 
         /// <summary> Return a DateTime presuming UTC with the parse of the string JToken. </summary>
         /// <param name="token">Token to convert. Must be a string. May be null.</param>
-        /// <returns>DateTime, or DateTime.MinValue if conversion fails</returns>
+        /// <returns>DateTime with Kind=UTC, or DateTime.MinValue (with Kind=UTC) if conversion fails</returns>
         public static DateTime DateTimeUTC(this JToken token)
         {
             if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
                 return ret;
             else
-                return System.DateTime.MinValue;
+                return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
         }
 
         /// <summary>Convert a string token to an enumeration of type T.  Return def if conversion fails </summary>
