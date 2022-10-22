@@ -213,5 +213,16 @@ namespace QuickJSON.Utils
             match = match.RegExWildCardToRegular();
             return System.Text.RegularExpressions.Regex.IsMatch(value, match, caseinsensitive ? System.Text.RegularExpressions.RegexOptions.IgnoreCase : System.Text.RegularExpressions.RegexOptions.None);
         }
+
+        public static string NewLine(this string s)
+        {
+            if (s.Length > 0 && !s.EndsWith(Environment.NewLine))
+                s += Environment.NewLine;
+            return s;
+        }
+        public static string AlwaysQuoteString(this string obj)
+        {
+            return "\"" + obj.Replace("\"", "\\\"") + "\"";
+        }
     }
 }

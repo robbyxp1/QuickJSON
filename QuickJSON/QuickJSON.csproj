@@ -20,13 +20,14 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>First release of QuickJSON</PackageReleaseNotes>
+    <PackageReleaseNotes>Fix issue with DateTimeUTC so it returns a mindate with UTC kind if it fails to convert
+DoubleNull and FloatNull added</PackageReleaseNotes>
     <Description>A quick and simple JSON encoder and decoder for .net. 
 Designed for speed and compactness.
 Code can be XCOPYED into your project to avoid DLL dependencies.</Description>
     <Copyright>(C) robbyxp @ gihub.com</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.9.1</Version>
+    <Version>0.9.5</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net5.0|AnyCPU'">

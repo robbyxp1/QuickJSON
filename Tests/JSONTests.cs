@@ -840,13 +840,51 @@ namespace JSONTests
                 Check.That(ji["d"].Double()).Equals(double.MaxValue);
             }
         }
+        //[Test]
+        //public void JSONToFluent()
+        //{
+        //    {
+        //        JObject jo = new JObject()
+        //        {
+        //            ["a"] = 10,
+        //            ["b"] = 1029292882892.2,
+        //            ["c"] = "\"fred\"",
+        //            ["d"] = new DateTime(2020,12,1, 2, 3, 4),
+        //            ["e"] = 10E10,
+        //        };
+
+        //        string text = jo.ToString();
+
+        //        string str = "";
+        //        QuickJSON.JSONToFluent.Convert(jo, ref str, false);
+
+        //        Check.That(str).Equals(".Object().V(10).V(1029292882892.2).V(\"\"fred\"\").V(\"2020-12-01T02:03:04Z\").V(100000000000.0).Close()");
+        //    }
+        //}
 
 
         [Test]
         public void JSONToObject()
         {
             {
-                JToken t1 = JToken.Parse(@"{ ""one"":2929, ""two"":29, ""three"":32, ""four"":null, ""five"":505 , ""six"":606, ""seven"":1.1, ""eight"":true, ""nine"":9.9, ""ten"":""2020-02-01T00:00:00Z"",""eleven"":""2020-02-02T00:00:00Z"" }");
+                JToken t1 = JToken.Parse(@"{ ""one"":2929, ""two"":29, ""three"":32, ""four"":null, ""six"":606, ""seven"":1.1, ""eight"":true, ""nine"":9.9, ""ten"":""2020-02-01T00:00:00Z"",""eleven"":""2020-02-02T00:00:00Z"" }");
+                OtherTypes o1 = t1.ToObject<OtherTypes>();
+                Check.That(o1).IsNotNull();
+                Check.That(o1.one).Equals(2929);
+                Check.That(o1.two).Equals(29);
+                Check.That(o1.three).Equals(32);
+                Check.That(o1.four).IsNull();
+                Check.That(o1.five).Equals(null);
+                Check.That(o1.six).Equals(606);
+                Check.That(o1.seven).Equals(1.1);
+                Check.That(o1.eight).IsEqualTo(true);
+                Check.That(o1.nine).Equals(9.9f);
+                Check.That(o1.ten).Equals(new DateTime(2020, 2, 1));
+                Check.That(o1.eleven).Equals(new DateTime(2020, 2, 2));
+
+            }
+            {
+                JToken t1 = JToken.Parse(@"{ ""one"":2929, ""two"":29, ""three"":32, ""four"":null, ""five"":505 , ""six"":606, ""seven"":1.1, ""eight"":true, ""nine"":9.9 }");
                 OtherTypes o1 = t1.ToObject<OtherTypes>();
                 Check.That(o1).IsNotNull();
                 Check.That(o1.one).Equals(2929);
@@ -858,8 +896,8 @@ namespace JSONTests
                 Check.That(o1.seven).Equals(1.1);
                 Check.That(o1.eight).IsEqualTo(true);
                 Check.That(o1.nine).Equals(9.9f);
-                Check.That(o1.ten).Equals(new DateTime(2020, 2, 1));
-                Check.That(o1.eleven).Equals(new DateTime(2020, 2, 2));
+                Check.That(o1.ten).Equals(new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+                Check.That(o1.eleven).Equals(null);
 
             }
 
