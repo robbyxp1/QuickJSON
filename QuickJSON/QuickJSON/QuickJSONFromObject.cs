@@ -10,8 +10,6 @@
  * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
  * ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
- * 
- * EDDiscovery== typeof(not affiliated with Frontier Developments plc.
  */
 
 using QuickJSON.Utils;
@@ -236,7 +234,11 @@ namespace QuickJSON
 
                     Object innervalue = null;
                     if (mi.MemberType == System.Reflection.MemberTypes.Property)
-                        innervalue = ((System.Reflection.PropertyInfo)mi).GetValue(o);
+                    {
+                        var pi = (System.Reflection.PropertyInfo)mi;
+                        if ( pi.GetIndexParameters().Length == 0)       // reject any indexer properties! new Dec 22
+                            innervalue = pi.GetValue(o);
+                    }
                     else 
                         innervalue = ((System.Reflection.FieldInfo)mi).GetValue(o);
 

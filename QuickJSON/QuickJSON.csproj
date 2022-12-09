@@ -17,28 +17,38 @@
     <Authors>robbyxp @ gihub.com</Authors>
     <PackageProjectUrl>https://github.com/robbyxp1/QuickJSON</PackageProjectUrl>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>Fix issue with DateTimeUTC so it returns a mindate with UTC kind if it fails to convert
+    <PackageReleaseNotes>1.00
+Fix issue with FromObject when access property indexer []
+Made ToString() work so much faster by using StringBuilder!
+0.95
+Fix issue with DateTimeUTC so it returns a mindate with UTC kind if it fails to convert
 DoubleNull and FloatNull added</PackageReleaseNotes>
-    <Description>A quick and simple JSON encoder and decoder for .net. 
+    <Description>A quick and simple JSON encoder and decoder for .net.
 Designed for speed and compactness.
-Code can be XCOPYED into your project to avoid DLL dependencies.</Description>
+Code can be XCOPYED into your project to avoid DLL dependencies.
+</Description>
     <Copyright>(C) robbyxp @ gihub.com</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.9.5</Version>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net5.0|AnyCPU'">
     <DocumentationFile>C:\Code\QuickJSON\QuickJSON\bin\release\QuickJSON.xml</DocumentationFile>
   </PropertyGroup>
 
- 
+
 
   <!-- Conditionally obtain references for the .NET Framework target -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net48' ">
     <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="readme.md" Pack="true" PackagePath=""/>
   </ItemGroup>
   
   <ItemGroup>
@@ -51,9 +61,9 @@ Code can be XCOPYED into your project to avoid DLL dependencies.</Description>
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <DefineConstants>DEBUG;TRACE;JSONBIGINT</DefineConstants>
   </PropertyGroup>
-  
+
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <DefineConstants>TRACE;JSONBIGINT</DefineConstants>
-  </PropertyGroup>  
+  </PropertyGroup>
 
 </Project>

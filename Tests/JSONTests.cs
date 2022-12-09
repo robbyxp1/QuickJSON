@@ -23,6 +23,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Tests;
 
 namespace JSONTests
@@ -228,6 +229,24 @@ namespace JSONTests
                 string expectedjson = "{\"One\":\"one\",\"Two\":\"two\",\"Array\":[\"one\",\"two\",10.23]}";
 
                 Check.That(j1.ToString()).IsEqualTo(expectedjson);
+
+                StringBuilder str = new StringBuilder();
+                JToken.ToStringBuilder(str, j1, ">", "\r\n", "    ", false);
+                string res = str.ToString();
+                string cmp =
+@">{
+>    ""One"":""one"",
+>    ""Two"":""two"",
+>    ""Array"":
+>    [
+>        ""one"",
+>        ""two"",
+>        10.23
+>    ]
+>}
+";
+
+                Check.That(res).IsEqualTo(cmp);
             }
 
             {
@@ -302,8 +321,8 @@ namespace JSONTests
             System.Diagnostics.Debug.WriteLine("" + ja.ToString().QuoteString());
 
             string expectedjson = "[\"one\",\"two\",\"three\",{\"SystemAllegiance\":true}]";
-
-            Check.That(ja.ToString()).IsEqualTo(expectedjson);
+            string str = ja.ToString();
+            Check.That(str).IsEqualTo(expectedjson);
 
             //     string s = ja.Find<JString>(x => x is JString && ((JString)x).Value.Equals("one"))?.Value;
 
@@ -840,27 +859,6 @@ namespace JSONTests
                 Check.That(ji["d"].Double()).Equals(double.MaxValue);
             }
         }
-        //[Test]
-        //public void JSONToFluent()
-        //{
-        //    {
-        //        JObject jo = new JObject()
-        //        {
-        //            ["a"] = 10,
-        //            ["b"] = 1029292882892.2,
-        //            ["c"] = "\"fred\"",
-        //            ["d"] = new DateTime(2020,12,1, 2, 3, 4),
-        //            ["e"] = 10E10,
-        //        };
-
-        //        string text = jo.ToString();
-
-        //        string str = "";
-        //        QuickJSON.JSONToFluent.Convert(jo, ref str, false);
-
-        //        Check.That(str).Equals(".Object().V(10).V(1029292882892.2).V(\"\"fred\"\").V(\"2020-12-01T02:03:04Z\").V(100000000000.0).Close()");
-        //    }
-        //}
 
 
         [Test]
@@ -975,12 +973,17 @@ namespace JSONTests
 
 
             {
-                string englist = @"{ ""timestamp"":""2020 - 08 - 03T12: 07:15Z"",""event"":""EngineerProgress"",""Engineers"":[{""Engineer"":""Etienne Dorn"",""EngineerID"":2929,""Progress"":""Invited"",""Rank"":null},{""Engineer"":""Zacariah Nemo"",""EngineerID"":300050,""Progress"":""Known""},{""Engineer"":""Tiana Fortune"",""EngineerID"":300270,""Progress"":""Invited""},{""Engineer"":""Chloe Sedesi"",""EngineerID"":300300,""Progress"":""Invited""},{""Engineer"":""Marco Qwent"",""EngineerID"":300200,""Progress"":""Unlocked"",""RankProgress"":55,""Rank"":3},{""Engineer"":""Petra Olmanova"",""EngineerID"":300130,""Progress"":""Invited""},{""Engineer"":""Hera Tani"",""EngineerID"":300090,""Progress"":""Unlocked"",""RankProgress"":59,""Rank"":3},{""Engineer"":""Tod 'The Blaster' McQuinn"",""EngineerID"":300260,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Marsha Hicks"",""EngineerID"":300150,""Progress"":""Invited""},{""Engineer"":""Selene Jean"",""EngineerID"":300210,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Lei Cheung"",""EngineerID"":300120,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Juri Ishmaak"",""EngineerID"":300250,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Felicity Farseer"",""EngineerID"":300100,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Broo Tarquin"",""EngineerID"":300030,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Professor Palin"",""EngineerID"":300220,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Colonel Bris Dekker"",""EngineerID"":300140,""Progress"":""Invited""},{""Engineer"":""Elvira Martuuk"",""EngineerID"":300160,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Lori Jameson"",""EngineerID"":300230,""Progress"":""Invited""},{""Engineer"":""The Dweller"",""EngineerID"":300180,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Liz Ryder"",""EngineerID"":300080,""Progress"":""Unlocked"",""RankProgress"":81,""Rank"":3},{""Engineer"":""Didi Vatermann"",""EngineerID"":300000,""Progress"":""Invited""},{""Engineer"":""The Sarge"",""EngineerID"":300040,""Progress"":""Invited""},{""Engineer"":""Mel Brandon"",""EngineerID"":300280,""Progress"":""Known""},{""Engineer"":""Ram Tah"",""EngineerID"":300110,""Progress"":""Invited""},{""Engineer"":""Bill Turner"",""EngineerID"":300010,""Progress"":""Invited""}]}";
+                string englist = @"{ ""timestamp"":""2020 - 08 - 03T12: 07:15Z"",""event"":""EngineerProgress"",""Engineers"":[{""Engineer"":""Etienne\rDorn"",""EngineerID"":2929,""Progress"":""Invited"",""Rank"":null},{""Engineer"":""Zacariah Nemo"",""EngineerID"":300050,""Progress"":""Known""},{""Engineer"":""Tiana Fortune"",""EngineerID"":300270,""Progress"":""Invited""},{""Engineer"":""Chloe Sedesi"",""EngineerID"":300300,""Progress"":""Invited""},{""Engineer"":""Marco Qwent"",""EngineerID"":300200,""Progress"":""Unlocked"",""RankProgress"":55,""Rank"":3},{""Engineer"":""Petra Olmanova"",""EngineerID"":300130,""Progress"":""Invited""},{""Engineer"":""Hera Tani"",""EngineerID"":300090,""Progress"":""Unlocked"",""RankProgress"":59,""Rank"":3},{""Engineer"":""Tod 'The Blaster' McQuinn"",""EngineerID"":300260,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Marsha Hicks"",""EngineerID"":300150,""Progress"":""Invited""},{""Engineer"":""Selene Jean"",""EngineerID"":300210,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Lei Cheung"",""EngineerID"":300120,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Juri Ishmaak"",""EngineerID"":300250,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Felicity Farseer"",""EngineerID"":300100,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Broo Tarquin"",""EngineerID"":300030,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Professor Palin"",""EngineerID"":300220,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Colonel Bris Dekker"",""EngineerID"":300140,""Progress"":""Invited""},{""Engineer"":""Elvira Martuuk"",""EngineerID"":300160,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Lori Jameson"",""EngineerID"":300230,""Progress"":""Invited""},{""Engineer"":""The Dweller"",""EngineerID"":300180,""Progress"":""Unlocked"",""RankProgress"":0,""Rank"":5},{""Engineer"":""Liz Ryder"",""EngineerID"":300080,""Progress"":""Unlocked"",""RankProgress"":81,""Rank"":3},{""Engineer"":""Didi Vatermann"",""EngineerID"":300000,""Progress"":""Invited""},{""Engineer"":""The Sarge"",""EngineerID"":300040,""Progress"":""Invited""},{""Engineer"":""Mel Brandon"",""EngineerID"":300280,""Progress"":""Known""},{""Engineer"":""Ram Tah"",""EngineerID"":300110,""Progress"":""Invited""},{""Engineer"":""Bill Turner"",""EngineerID"":300010,""Progress"":""Invited""}]}";
                 JToken englistj = JToken.Parse(englist);
 
                 var pinfo = englistj["Engineers"]?.ToObject<ProgressInformation[]>();
                 Check.That(pinfo).IsNotNull();
                 Check.That(pinfo.Count()).Equals(25);
+                StringBuilder str = new StringBuilder();
+                JToken.ToStringBuilder(str, englistj, "", "", "", false);
+                string strstr = str.ToString();
+                string compare = "{\"timestamp\":\"2020 - 08 - 03T12: 07:15Z\",\"event\":\"EngineerProgress\",\"Engineers\":[{\"Engineer\":\"Etienne\\rDorn\",\"EngineerID\":2929,\"Progress\":\"Invited\",\"Rank\":null},{\"Engineer\":\"Zacariah Nemo\",\"EngineerID\":300050,\"Progress\":\"Known\"},{\"Engineer\":\"Tiana Fortune\",\"EngineerID\":300270,\"Progress\":\"Invited\"},{\"Engineer\":\"Chloe Sedesi\",\"EngineerID\":300300,\"Progress\":\"Invited\"},{\"Engineer\":\"Marco Qwent\",\"EngineerID\":300200,\"Progress\":\"Unlocked\",\"RankProgress\":55,\"Rank\":3},{\"Engineer\":\"Petra Olmanova\",\"EngineerID\":300130,\"Progress\":\"Invited\"},{\"Engineer\":\"Hera Tani\",\"EngineerID\":300090,\"Progress\":\"Unlocked\",\"RankProgress\":59,\"Rank\":3},{\"Engineer\":\"Tod 'The Blaster' McQuinn\",\"EngineerID\":300260,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Marsha Hicks\",\"EngineerID\":300150,\"Progress\":\"Invited\"},{\"Engineer\":\"Selene Jean\",\"EngineerID\":300210,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Lei Cheung\",\"EngineerID\":300120,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Juri Ishmaak\",\"EngineerID\":300250,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Felicity Farseer\",\"EngineerID\":300100,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Broo Tarquin\",\"EngineerID\":300030,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Professor Palin\",\"EngineerID\":300220,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Colonel Bris Dekker\",\"EngineerID\":300140,\"Progress\":\"Invited\"},{\"Engineer\":\"Elvira Martuuk\",\"EngineerID\":300160,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Lori Jameson\",\"EngineerID\":300230,\"Progress\":\"Invited\"},{\"Engineer\":\"The Dweller\",\"EngineerID\":300180,\"Progress\":\"Unlocked\",\"RankProgress\":0,\"Rank\":5},{\"Engineer\":\"Liz Ryder\",\"EngineerID\":300080,\"Progress\":\"Unlocked\",\"RankProgress\":81,\"Rank\":3},{\"Engineer\":\"Didi Vatermann\",\"EngineerID\":300000,\"Progress\":\"Invited\"},{\"Engineer\":\"The Sarge\",\"EngineerID\":300040,\"Progress\":\"Invited\"},{\"Engineer\":\"Mel Brandon\",\"EngineerID\":300280,\"Progress\":\"Known\"},{\"Engineer\":\"Ram Tah\",\"EngineerID\":300110,\"Progress\":\"Invited\"},{\"Engineer\":\"Bill Turner\",\"EngineerID\":300010,\"Progress\":\"Invited\"}]}";
+                Check.That(strstr).Equals(compare);
             }
 
             {
@@ -1251,6 +1254,38 @@ namespace JSONTests
                 Check.That(t).IsNotNull();
                 string json = t.ToString(true);
                 System.Diagnostics.Debug.WriteLine("JSON " + json);
+
+                StringBuilder str = new StringBuilder();
+                JToken.ToStringBuilder(str, t, ">", "\r\n", "    ", false);
+                string res = str.ToString();
+                string cmp =
+@">[
+>    {
+>        ""RValue"":0,
+>        ""PropGetSet"":0,
+>        ""Count"":0,
+>        ""Name"":""0"",
+>        ""Name_Localised"":""L0"",
+>        ""FriendlyName"":null,
+>        ""Category"":null,
+>        ""QValue"":null
+>    },
+>    {
+>        ""RValue"":0,
+>        ""PropGetSet"":0,
+>        ""Count"":0,
+>        ""Name"":""1"",
+>        ""Name_Localised"":""L1"",
+>        ""FriendlyName"":null,
+>        ""Category"":null,
+>        ""QValue"":20
+>    }
+>]
+";
+
+                Check.That(res).Equals(cmp);
+
+
             }
 
             {
@@ -1626,6 +1661,32 @@ namespace JSONTests
             //    string sa1 = f1.Get();
             //    Check.That(sa1).Equals(@"[ { ""one"":1, ""two"":2, ""three"":{ ""threeone"":""A"", ""threetwo"":""B"" }, ""four"":4 } ]");
             //}
+        }
+
+        [Test]
+        public void JSONToStringSpeed()
+        {
+
+            {
+                List<Tuple<string, double, double, double>> d1 = new List<Tuple<string, double, double, double>>();
+                for (int i = 0; i < 10000; i++)
+                    d1.Add(new Tuple<string, double, double, double>("str" + i, i * 1, i * 2, i * 4));
+
+                JToken jo = JToken.FromObject(d1, true);
+
+                Stopwatch sw = new Stopwatch(); sw.Start();
+
+                StringBuilder str = new StringBuilder();
+
+                JToken.ToStringBuilder(str, jo, "", "", "", false);
+
+                string res = str.ToString();
+
+                var time = sw.ElapsedMilliseconds;
+                Check.That(time).IsStrictlyLessThan(100);
+                // measured at 6.7/10000 for traditional tostring
+                // much faster with string builder
+            }
 
         }
     }

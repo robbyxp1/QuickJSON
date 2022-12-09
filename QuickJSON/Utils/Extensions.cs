@@ -188,6 +188,30 @@ namespace QuickJSON.Utils
             return s;
         }
 
+        public static System.Text.StringBuilder AppendEscapeControlCharsFull(this System.Text.StringBuilder str, string s)
+        {
+            foreach (var c in s)
+            {
+                if (c == '\\')
+                    str.Append(@"\\");
+                else if (c == '\r')
+                    str.Append(@"\r");
+                else if (c == '"')
+                    str.Append("\\\"");
+                else if (c == '\t')
+                    str.Append(@"\t");
+                else if (c == '\b')
+                    str.Append(@"\b");
+                else if (c == '\f')
+                    str.Append(@"\f");
+                else if (c == '\n')
+                    str.Append(@"\n");
+                else
+                    str.Append(c);
+            }
+            return str;
+        }
+
         static public int? ToHex(this char c)
         {
             if (char.IsDigit(c))
