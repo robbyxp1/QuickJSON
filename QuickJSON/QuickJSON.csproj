@@ -22,6 +22,7 @@
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
     <PackageReleaseNotes>1.1 
+ToObject and FromObject gets better handling of IEnumerations, so HashSet can be handled
 1.01
 Upload to Nuget had wrong dll - try again
 1.00
