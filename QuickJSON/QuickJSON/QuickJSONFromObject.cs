@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2020 Robbyxp1 @ github.com
+ * Copyright © 2020-2023 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -91,68 +91,7 @@ namespace QuickJSON
 
             Type tt = o.GetType();
 
-            if (tt.IsArray)
-            {
-                Array b = o as Array;
-
-                JArray outarray = new JArray();
-
-                objectlist.Push(o);
-
-                for (int i = 0; i < b.Length; i++)
-                {
-                    object oa = b.GetValue(i);
-                    if (objectlist.Contains(oa))        // self reference
-                    {
-                        objectlist.Pop();
-                        return new JToken(TType.Error, "Self Reference in Array");
-                    }
-
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignored, objectlist,lvl+1, maxrecursiondepth, membersearchflags);
-
-                    if (inner.IsInError)      // used as an error type
-                    {
-                        objectlist.Pop();
-                        return inner;
-                    }
-
-                    outarray.Add(inner);
-                }
-
-                objectlist.Pop();
-                return outarray;
-            }
-            else if (typeof(System.Collections.IList).IsAssignableFrom(tt))
-            {
-                var ilist = o as System.Collections.IList;
-
-                JArray outarray = new JArray();
-
-                objectlist.Push(o);
-
-                foreach (var oa in ilist)
-                {
-                    if (objectlist.Contains(oa))        // self reference
-                    {
-                        objectlist.Pop();
-                        return new JToken(TType.Error, "Self Reference in IList");
-                    }
-
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignored, objectlist,lvl+1, maxrecursiondepth, membersearchflags);
-
-                    if (inner.IsInError)      // used as an error type
-                    {
-                        objectlist.Pop();
-                        return inner;
-                    }
-
-                    outarray.Add(inner);
-                }
-
-                objectlist.Pop();
-                return outarray;
-            }
-            else if (typeof(System.Collections.IDictionary).IsAssignableFrom(tt))       // if its a Dictionary<x,y> then expect a set of objects
+            if (typeof(System.Collections.IDictionary).IsAssignableFrom(tt))       // if its a Dictionary<x,y> then expect a set of objects
             {
                 System.Collections.IDictionary idict = o as System.Collections.IDictionary;
 
@@ -171,14 +110,14 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IDictionary");
                     }
 
-                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignored, objectlist,lvl+1, maxrecursiondepth, membersearchflags);
+                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
                         return inner;
                     }
 
-                    if ( kvp.Key is DateTime)               // handle date time specially, use zulu format
+                    if (kvp.Key is DateTime)               // handle date time specially, use zulu format
                     {
                         DateTime t = (DateTime)kvp.Key;
                         outobj[t.ToStringZulu()] = inner;
@@ -190,9 +129,44 @@ namespace QuickJSON
                 objectlist.Pop();
                 return outobj;
             }
-            else if ( (tt.IsClass && tt != typeof(string)) ||                           // if class, but not string (handled in CreateToken)
+            else if (o is string)           // strings look like classes, so need to intercept first
+            {
+                var r = JToken.CreateToken(o, false);        // return token or null indicating unserializable
+                return r ?? new JToken(TType.Error, "Unserializable " + tt.Name);
+            }
+            else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(tt))       // enumerables, arrays, lists, hashsets
+            {
+                var ilist = o as System.Collections.IEnumerable;
+
+                JArray outarray = new JArray();
+
+                objectlist.Push(o);
+
+                foreach (var oa in ilist)
+                {
+                    if (objectlist.Contains(oa))        // self reference
+                    {
+                        objectlist.Pop();
+                        return new JToken(TType.Error, "Self Reference in IEnumerable");
+                    }
+
+                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);
+
+                    if (inner.IsInError)      // used as an error type
+                    {
+                        objectlist.Pop();
+                        return inner;
+                    }
+
+                    outarray.Add(inner);
+                }
+
+                objectlist.Pop();
+                return outarray;
+            }
+            else if ( tt.IsClass ||                                     // if class
                       (tt.IsValueType && !tt.IsPrimitive && !tt.IsEnum && tt != typeof(DateTime))     // if value type, not primitive, not enum, its a structure. Not datetime (handled in CreateToken)
-                      )
+                    )
             {
                 JObject outobj = new JObject();
 
@@ -236,13 +210,13 @@ namespace QuickJSON
                     if (mi.MemberType == System.Reflection.MemberTypes.Property)
                     {
                         var pi = (System.Reflection.PropertyInfo)mi;
-                        if ( pi.GetIndexParameters().Length == 0)       // reject any indexer properties! new Dec 22
+                        if (pi.GetIndexParameters().Length == 0)       // reject any indexer properties! new Dec 22
                             innervalue = pi.GetValue(o);
                     }
-                    else 
+                    else
                         innervalue = ((System.Reflection.FieldInfo)mi).GetValue(o);
 
-                    if ( innervalue != null )
+                    if (innervalue != null)
                     {
                         if (objectlist.Contains(innervalue))        // self reference
                         {
@@ -250,10 +224,10 @@ namespace QuickJSON
                                 continue;
 
                             objectlist.Pop();
-                            return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name );
+                            return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
 
-                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignored, objectlist, lvl+1, maxrecursiondepth, membersearchflags);     // may return End Object if not serializable
+                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);     // may return End Object if not serializable
 
                         if (token.IsInError)
                         {

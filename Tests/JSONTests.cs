@@ -865,6 +865,58 @@ namespace JSONTests
         public void JSONToObject()
         {
             {
+                Dictionary<string, int> s1 = new Dictionary<string, int>() { ["one"] = 1, ["two"] = 2, ["three"] = 3 };
+                JToken t1 = JToken.FromObject(s1);
+                Check.That(t1).IsNotNull();
+
+                var retobj = t1.ToObject<Dictionary<string, int>>();
+                Check.That(retobj).IsNotNull();
+                Check.That(retobj.Count).IsEqualTo(3);
+                Check.That(retobj.ContainsKey("one")).IsTrue();
+                Check.That(retobj.ContainsKey("two")).IsTrue();
+                Check.That(retobj.ContainsKey("three")).IsTrue();
+                Check.That(retobj["one"]).IsEqualTo(1);
+                Check.That(retobj["two"]).IsEqualTo(2);
+                Check.That(retobj["three"]).IsEqualTo(3);
+
+                var retobj2 = t1.ToObject<string>();        // check it bombs out ok
+                Check.That(retobj2).IsNull();
+                var retobj3 = t1.ToObject<int[]>();        // check it bombs out ok
+                Check.That(retobj3).IsNull();
+
+            }
+            {
+                List<string> s1 = new List<string>() { "one", "two", "three" };
+                JToken t1 = JToken.FromObject(s1);
+                Check.That(t1).IsNotNull();
+
+                var retobj = t1.ToObject<List<string>>();
+                Check.That(retobj).IsNotNull();
+                Check.That(retobj.Count).IsEqualTo(3);
+                Check.That(retobj[0]).IsEqualTo("one");
+                Check.That(retobj[1]).IsEqualTo("two");
+                Check.That(retobj[2]).IsEqualTo("three");
+
+            }
+            {
+                HashSet<string> s1 = new HashSet<string>() { "one", "two", "three" };
+                JToken t1 = JToken.FromObject(s1);
+                Check.That(t1).IsNotNull();
+
+                var retobj = t1.ToObject<List<string>>();
+                Check.That(retobj).IsNotNull();
+                Check.That(retobj.Count).IsEqualTo(3);
+                Check.That(retobj.Contains("one")).IsTrue();
+                Check.That(retobj.Contains("two")).IsTrue();
+                Check.That(retobj.Contains("three")).IsTrue();
+
+            }
+
+
+
+
+
+            {
                 JToken t1 = JToken.Parse(@"{ ""one"":2929, ""two"":29, ""three"":32, ""four"":null, ""six"":606, ""seven"":1.1, ""eight"":true, ""nine"":9.9, ""ten"":""2020-02-01T00:00:00Z"",""eleven"":""2020-02-02T00:00:00Z"" }");
                 OtherTypes o1 = t1.ToObject<OtherTypes>();
                 Check.That(o1).IsNotNull();
@@ -896,8 +948,8 @@ namespace JSONTests
                 Check.That(o1.nine).Equals(9.9f);
                 Check.That(o1.ten).Equals(new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc));
                 Check.That(o1.eleven).Equals(null);
-
             }
+
 
             {
                 string mats = @"{ ""timestamp"":""2020-04-23T19:18:18Z"", ""event"":""Materials"", ""Raw"":[ { ""Name"":""carbon"", ""Count"":77 }, { ""Name"":""sulphur"", ""Count"":81 }, { ""Name"":""tin"", ""Count"":46 }, { ""Name"":""chromium"", ""Count"":32 }, { ""Name"":""nickel"", ""Count"":83 }, { ""Name"":""zinc"", ""Count"":59 }, { ""Name"":""iron"", ""Count"":48 }, { ""Name"":""phosphorus"", ""Count"":28 }, { ""Name"":""manganese"", ""Count"":60 }, { ""Name"":""niobium"", ""Count"":26 }, { ""Name"":""molybdenum"", ""Count"":25 }, { ""Name"":""antimony"", ""Count"":27 }, { ""Name"":""mercury"", ""Count"":5 }, { ""Name"":""yttrium"", ""Count"":50 }, { ""Name"":""selenium"", ""Count"":23 }, { ""Name"":""zirconium"", ""Count"":16 }, { ""Name"":""cadmium"", ""Count"":65 }, { ""Name"":""germanium"", ""Count"":26 }, { ""Name"":""tellurium"", ""Count"":39 }, { ""Name"":""vanadium"", ""Count"":49 }, { ""Name"":""arsenic"", ""Count"":14 }, { ""Name"":""technetium"", ""Count"":9 }, { ""Name"":""polonium"", ""Count"":21 }, { ""Name"":""tungsten"", ""Count"":54 } ], ""Manufactured"":[ { ""Name"":""focuscrystals"", ""Name_Localised"":""Focus Crystals"", ""Count"":9 }, { ""Name"":""refinedfocuscrystals"", ""Name_Localised"":""Refined Focus Crystals"", ""Count"":20 }, { ""Name"":""shieldingsensors"", ""Name_Localised"":""Shielding Sensors"", ""Count"":11 }, { ""Name"":""wornshieldemitters"", ""Name_Localised"":""Worn Shield Emitters"", ""Count"":29 }, { ""Name"":""shieldemitters"", ""Name_Localised"":""Shield Emitters"", ""Count"":44 }, { ""Name"":""heatdispersionplate"", ""Name_Localised"":""Heat Dispersion Plate"", ""Count"":29 }, { ""Name"":""fedproprietarycomposites"", ""Name_Localised"":""Proprietary Composites"", ""Count"":3 }, { ""Name"":""fedcorecomposites"", ""Name_Localised"":""Core Dynamics Composites"", ""Count"":2 }, { ""Name"":""compoundshielding"", ""Name_Localised"":""Compound Shielding"", ""Count"":25 }, { ""Name"":""salvagedalloys"", ""Name_Localised"":""Salvaged Alloys"", ""Count"":24 }, { ""Name"":""heatconductionwiring"", ""Name_Localised"":""Heat Conduction Wiring"", ""Count"":33 }, { ""Name"":""gridresistors"", ""Name_Localised"":""Grid Resistors"", ""Count"":24 }, { ""Name"":""hybridcapacitors"", ""Name_Localised"":""Hybrid Capacitors"", ""Count"":22 }, { ""Name"":""mechanicalequipment"", ""Name_Localised"":""Mechanical Equipment"", ""Count"":41 }, { ""Name"":""mechanicalscrap"", ""Name_Localised"":""Mechanical Scrap"", ""Count"":35 }, { ""Name"":""polymercapacitors"", ""Name_Localised"":""Polymer Capacitors"", ""Count"":4 }, { ""Name"":""phasealloys"", ""Name_Localised"":""Phase Alloys"", ""Count"":8 }, { ""Name"":""uncutfocuscrystals"", ""Name_Localised"":""Flawed Focus Crystals"", ""Count"":17 }, { ""Name"":""highdensitycomposites"", ""Name_Localised"":""High Density Composites"", ""Count"":36 }, { ""Name"":""mechanicalcomponents"", ""Name_Localised"":""Mechanical Components"", ""Count"":26 }, { ""Name"":""chemicalprocessors"", ""Name_Localised"":""Chemical Processors"", ""Count"":28 }, { ""Name"":""conductivecomponents"", ""Name_Localised"":""Conductive Components"", ""Count"":27 }, { ""Name"":""biotechconductors"", ""Name_Localised"":""Biotech Conductors"", ""Count"":8 }, { ""Name"":""galvanisingalloys"", ""Name_Localised"":""Galvanising Alloys"", ""Count"":27 }, { ""Name"":""heatexchangers"", ""Name_Localised"":""Heat Exchangers"", ""Count"":17 }, { ""Name"":""conductivepolymers"", ""Name_Localised"":""Conductive Polymers"", ""Count"":19 }, { ""Name"":""configurablecomponents"", ""Name_Localised"":""Configurable Components"", ""Count"":13 }, { ""Name"":""heatvanes"", ""Name_Localised"":""Heat Vanes"", ""Count"":18 }, { ""Name"":""chemicalmanipulators"", ""Name_Localised"":""Chemical Manipulators"", ""Count"":26 }, { ""Name"":""heatresistantceramics"", ""Name_Localised"":""Heat Resistant Ceramics"", ""Count"":2 }, { ""Name"":""protoheatradiators"", ""Name_Localised"":""Proto Heat Radiators"", ""Count"":54 }, { ""Name"":""crystalshards"", ""Name_Localised"":""Crystal Shards"", ""Count"":10 }, { ""Name"":""exquisitefocuscrystals"", ""Name_Localised"":""Exquisite Focus Crystals"", ""Count"":16 }, { ""Name"":""unknownenergysource"", ""Name_Localised"":""Sensor Fragment"", ""Count"":11 }, { ""Name"":""protolightalloys"", ""Name_Localised"":""Proto Light Alloys"", ""Count"":1 }, { ""Name"":""thermicalloys"", ""Name_Localised"":""Thermic Alloys"", ""Count"":2 }, { ""Name"":""conductiveceramics"", ""Name_Localised"":""Conductive Ceramics"", ""Count"":18 }, { ""Name"":""chemicaldistillery"", ""Name_Localised"":""Chemical Distillery"", ""Count"":6 }, { ""Name"":""chemicalstorageunits"", ""Name_Localised"":""Chemical Storage Units"", ""Count"":3 } ], ""Encoded"":[ { ""Name"":""shielddensityreports"", ""Name_Localised"":""Untypical Shield Scans "", ""Count"":112 }, { ""Name"":""emissiondata"", ""Name_Localised"":""Unexpected Emission Data"", ""Count"":39 }, { ""Name"":""shieldcyclerecordings"", ""Name_Localised"":""Distorted Shield Cycle Recordings"", ""Count"":208 }, { ""Name"":""scrambledemissiondata"", ""Name_Localised"":""Exceptional Scrambled Emission Data"", ""Count"":29 }, { ""Name"":""decodedemissiondata"", ""Name_Localised"":""Decoded Emission Data"", ""Count"":38 }, { ""Name"":""classifiedscandata"", ""Name_Localised"":""Classified Scan Fragment"", ""Count"":7 }, { ""Name"":""consumerfirmware"", ""Name_Localised"":""Modified Consumer Firmware"", ""Count"":20 }, { ""Name"":""industrialfirmware"", ""Name_Localised"":""Cracked Industrial Firmware"", ""Count"":10 }, { ""Name"":""encryptedfiles"", ""Name_Localised"":""Unusual Encrypted Files"", ""Count"":3 }, { ""Name"":""scanarchives"", ""Name_Localised"":""Unidentified Scan Archives"", ""Count"":106 }, { ""Name"":""legacyfirmware"", ""Name_Localised"":""Specialised Legacy Firmware"", ""Count"":33 }, { ""Name"":""disruptedwakeechoes"", ""Name_Localised"":""Atypical Disrupted Wake Echoes"", ""Count"":67 }, { ""Name"":""hyperspacetrajectories"", ""Name_Localised"":""Eccentric Hyperspace Trajectories"", ""Count"":33 }, { ""Name"":""wakesolutions"", ""Name_Localised"":""Strange Wake Solutions"", ""Count"":25 }, { ""Name"":""encodedscandata"", ""Name_Localised"":""Divergent Scan Data"", ""Count"":16 }, { ""Name"":""archivedemissiondata"", ""Name_Localised"":""Irregular Emission Data"", ""Count"":5 }, { ""Name"":""encryptioncodes"", ""Name_Localised"":""Tagged Encryption Codes"", ""Count"":3 }, { ""Name"":""scandatabanks"", ""Name_Localised"":""Classified Scan Databanks"", ""Count"":110 }, { ""Name"":""shieldfrequencydata"", ""Name_Localised"":""Peculiar Shield Frequency Data"", ""Count"":18 }, { ""Name"":""unknownshipsignature"", ""Name_Localised"":""Thargoid Ship Signature"", ""Count"":3 }, { ""Name"":""unknownwakedata"", ""Name_Localised"":""Thargoid Wake Data"", ""Count"":3 }, { ""Name"":""embeddedfirmware"", ""Name_Localised"":""Modified Embedded Firmware"", ""Count"":3 }, { ""Name"":""securityfirmware"", ""Name_Localised"":""Security Firmware Patch"", ""Count"":5 }, { ""Name"":""shieldpatternanalysis"", ""Name_Localised"":""Aberrant Shield Pattern Analysis"", ""Count"":66 }, { ""Name"":""shieldsoakanalysis"", ""Name_Localised"":""Inconsistent Shield Soak Analysis"", ""Count"":117 }, { ""Name"":""fsdtelemetry"", ""Name_Localised"":""Anomalous FSD Telemetry"", ""Count"":24 }, { ""Name"":""bulkscandata"", ""Name_Localised"":""Anomalous Bulk Scan Data"", ""Count"":147 }, { ""Name"":""compactemissionsdata"", ""Name_Localised"":""Abnormal Compact Emissions Data"", ""Count"":9 }, { ""Name"":""dataminedwake"", ""Name_Localised"":""Datamined Wake Exceptions"", ""Count"":7 } ] }";
@@ -993,6 +1045,7 @@ namespace JSONTests
                 var decoded = decode.ToObject(typeof(string[]), false, true);
                 if (decoded is JTokenExtensions.ToObjectError)
                     System.Diagnostics.Debug.WriteLine("Err " + ((JTokenExtensions.ToObjectError)decoded).ErrorString);
+
 
                 var decoded2 = decode.ToObject(typeof(string), false, true);
                 Check.That(decoded2).IsInstanceOfType(typeof(JTokenExtensions.ToObjectError));
@@ -1213,6 +1266,22 @@ namespace JSONTests
             //    TestEnum enumvalue = TestEnum.one;
             //   // JToken t = JToken.FromObject(dt);
             //}
+
+            if ( true )
+            {
+                HashSet<string> hash = new HashSet<string>() { "one", "two", "three" };
+                JToken t = JToken.FromObject(hash);
+                JArray ja = t as JArray;
+                Check.That(ja).IsNotNull();
+                Check.That(ja.Count).IsEqualTo(3);
+            }
+
+            if ( true )
+            {
+                string t1 = "Hello";
+                JToken t = JToken.FromObject(t1);
+                Check.That(t.IsString).IsTrue();
+            }
 
             {
                 SizeF sf = new SizeF(10.2f, 12.2f);

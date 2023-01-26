@@ -21,7 +21,8 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>1.01
+    <PackageReleaseNotes>1.1 
+1.01
 Upload to Nuget had wrong dll - try again
 1.00
 Fix issue with FromObject when access property indexer []
@@ -35,7 +36,9 @@ Code can be XCOPYED into your project to avoid DLL dependencies.
 </Description>
     <Copyright>(C) robbyxp @ gihub.com</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.0.1</Version>
+    <Version>1.1</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net5.0|AnyCPU'">
@@ -47,6 +50,9 @@ Code can be XCOPYED into your project to avoid DLL dependencies.
   <!-- Conditionally obtain references for the .NET Framework target -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net48' ">
     <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="QuickJson.cs" />
   </ItemGroup>
 
   <ItemGroup>

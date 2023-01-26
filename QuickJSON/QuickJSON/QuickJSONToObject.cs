@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2021 Robbyxp1 @ github.com
+ * Copyright © 2021-2023 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -46,7 +46,7 @@ namespace QuickJSON
                 Object ret = token.ToObject(tt, ignoretypeerrors, checkcustomattr);        // paranoia, since there are a lot of dynamics, trap any exceptions
                 if (ret is ToObjectError)
                 {
-                    System.Diagnostics.Debug.WriteLine("To Object error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
+                    System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
                     return default(T);
                 }
                 else if (ret != null)      // or null
@@ -105,7 +105,8 @@ namespace QuickJSON
         /// Use the default plus DeclaredOnly for only members of the top class only </param>
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
-        /// <exception cref="System.InvalidCastException"> If a type failure occurs (TBD - not sure this is still applicable.)
+        /// <exception cref="System.Exception"> Generic exception
+        /// <exception cref="System.InvalidCastException"> If a type failure occurs.  Other excepections could also occur.
         /// </exception>
         public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors, bool checkcustomattr,
                 System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
@@ -119,53 +120,61 @@ namespace QuickJSON
             {
                 JArray jarray = (JArray)token;
 
-                if (converttype.IsArray)
+                try               // we need to protect this, as createinstance can fail here if a bad type is fed in, and we really want to report it via ObjectError
                 {
-                    dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, token.Count);   // dynamic holder for instance of array[]
-
-                    for (int i = 0; i < token.Count; i++)
+                    if (converttype.IsArray)        // need to handle arrays because it needs a defined length
                     {
-                        Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, checkcustomattr);      // get the underlying element, must match array element type
+                        dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, token.Count);   // dynamic holder for instance of array[]
 
-                        if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
+                        for (int i = 0; i < token.Count; i++)
                         {
-                            ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
-                            return ret;
+                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, checkcustomattr);      // get the underlying element, must match array element type
+
+                            if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
+                            {
+                                ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
+                                return ret;
+                            }
+                            else
+                            {
+                                dynamic d = converttype.GetElementType().ChangeTo(ret);
+                                instance[i] = d;
+                            }
                         }
-                        else
-                        {
-                            dynamic d = converttype.GetElementType().ChangeTo(ret);
-                            instance[i] = d;
-                        }
+
+                        return instance;
                     }
+                    else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(converttype))      // else anything which is enumerable can be handled
+                    {
+                        dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the List
+                        var types = converttype.GetGenericArguments();
 
-                    return instance;
+                        for (int i = 0; i < token.Count; i++)
+                        {
+                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, checkcustomattr);      // get the underlying element, must match types[0] which is list type
+
+                            if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
+                            {
+                                ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
+                                return ret;
+                            }
+                            else
+                            {
+                                dynamic d = types[0].ChangeTo(ret);
+                                instance.Add(d);
+                            }
+                        }
+
+                        return instance;
+                    }
+                    else
+                        return new ToObjectError($"JSONToObject: Not array {converttype.Name}");        // catch all ending
                 }
-                else if (typeof(System.Collections.IList).IsAssignableFrom(converttype))
+                catch
                 {
-                    dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the List
-                    var types = converttype.GetGenericArguments();
-
-                    for (int i = 0; i < token.Count; i++)
-                    {
-                        Object ret = ToObject(token[i], types[0], ignoretypeerrors, checkcustomattr);      // get the underlying element, must match types[0] which is list type
-
-                        if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
-                        {
-                            ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
-                            return ret;
-                        }
-                        else
-                        {
-                            dynamic d = types[0].ChangeTo(ret);
-                            instance.Add(d);
-                        }
-                    }
-
-                    return instance;
+                    return new ToObjectError($"JSONToObject: Create Error {converttype.Name}");       
                 }
-                else
-                    return new ToObjectError($"JSONToObject: Not array {converttype.Name}");
+
             }
             else if (token.TokenType == JToken.TType.Object)                   // objects are best efforts.. fills in as many fields as possible
             {
