@@ -54,6 +54,7 @@ Code can be XCOPYED into your project to avoid DLL dependencies.
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="QuickJson.cs" />
+    <Compile Remove="QuickJSON\QuickJSONTokenSender.cs" />
   </ItemGroup>
 
   <ItemGroup>

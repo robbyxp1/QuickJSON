@@ -43,7 +43,7 @@ namespace QuickJSON
         {
             using (StringReader sr = new StringReader(text))         // read directly from file..
             {
-                var parser = new StringParserQuickTextReader(sr, 16384);
+                var parser = new StringParserQuickTextReader(sr, charbufsize);
                 return ParseToken(parser, flags, charbufsize);
             }
         }
@@ -60,7 +60,7 @@ namespace QuickJSON
 
         public static IEnumerable<JToken> ParseToken(TextReader tr, JToken.ParseOptions flags = JToken.ParseOptions.None, int charbufsize = 16384)
         {
-            var parser = new StringParserQuickTextReader(tr, 16384);
+            var parser = new StringParserQuickTextReader(tr, charbufsize);
             return ParseToken(parser, flags, charbufsize);
         }
 
@@ -86,7 +86,7 @@ namespace QuickJSON
         private static IEnumerable<JToken> ParseTokenInt(IStringParserQuick parser, JToken.ParseOptions flags = JToken.ParseOptions.None, int maxstringlen = 16384)
         {
             char[] textbuffer = new char[maxstringlen];
-            JToken[] stack = new JToken[256];
+            JToken[] stack = new JToken[1024];
             int sptr = 0;
             bool comma = false;
             JArray curarray = null;

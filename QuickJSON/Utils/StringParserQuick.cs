@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2018-2021 robbyxp1 @ github.com
+ * Copyright © 2018-2023 robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -57,13 +57,30 @@ namespace QuickJSON.Utils
         /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.PeekChar"/>
         public char PeekChar()
         {
-            return (pos < line.Length) ? line[pos] : ' ';
+            return (pos < line.Length) ? line[pos] : char.MinValue;
         }
 
         /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.GetChar"/>
         public char GetChar()      
         {
-            return (pos < line.Length) ? line[pos++] : ' ';
+            return (pos < line.Length) ? line[pos++] : char.MinValue;
+        }
+
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.GetNextNonSpaceChar"/>
+        public char GetNextNonSpaceChar(bool skipspacesafter = true)
+        {
+            while (pos < line.Length && char.IsWhiteSpace(line[pos]))
+                pos++;
+
+            char ret = (pos < line.Length) ? line[pos++] : char.MinValue;
+
+            if ( skipspacesafter )
+            {
+                while (pos < line.Length && char.IsWhiteSpace(line[pos]))
+                    pos++;
+            }
+
+            return ret;
         }
 
         /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsStringMoveOn(string)"/>
@@ -82,12 +99,12 @@ namespace QuickJSON.Utils
         }
 
         /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsCharMoveOn(char, bool)"/>
-        public bool IsCharMoveOn(char t, bool skipspace = true)
+        public bool IsCharMoveOn(char t, bool skipspaceafter = true)
         {
             if (pos < line.Length && line[pos] == t)
             {
                 pos++;
-                if (skipspace)
+                if (skipspaceafter)
                     SkipSpace();
                 return true;
             }
@@ -107,8 +124,8 @@ namespace QuickJSON.Utils
 
         // Your on a " or ' quoted string, extract it.. You supply the buffer to read into, it returns no of chars read into it, -1 if error
 
-        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextQuotedString(char, char[], bool)"/>
-        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false)
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextQuotedString(char, char[], bool, bool)"/>
+        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false, bool skipafter = true)
         {
             int bpos = 0;
 
@@ -122,8 +139,11 @@ namespace QuickJSON.Utils
                 {
                     pos++; //skip end quote
 
-                    while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                        pos++;
+                    if (skipafter)
+                    {
+                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                            pos++;
+                    }
 
                     return bpos;
                 }
@@ -189,16 +209,18 @@ namespace QuickJSON.Utils
 
         static char[] decchars = new char[] { '.', 'e', 'E', '+', '-' };
 
-        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.JNextNumber(bool)"/>
-        public JToken JNextNumber(bool sign)     // must be on a digit
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.JNextNumber(bool,bool)"/>
+        public JToken JNextNumber(bool sign, bool skipafter = true)
         {
+            // must be on a digit
+
             ulong ulv = 0;
             bool bigint = false;
             int start = pos;
 
             while (true)
             {
-                if (pos == line.Length)         // if at end, return number got
+                if (pos == line.Length)         // if at end, return number got, no need to skip spaces
                 {
                     if (bigint)
                     {
@@ -229,8 +251,11 @@ namespace QuickJSON.Utils
 
                         string part = new string(line, start, pos - start);    // get double string
 
-                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                            pos++;
+                        if (skipafter)
+                        {
+                            while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                                pos++;
+                        }
 
                         if (double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double dv))
                             return new JToken(JToken.TType.Double,sign ? -dv : dv);
@@ -242,8 +267,11 @@ namespace QuickJSON.Utils
 #if JSONBIGINT
                         string part = new string(line, start, pos - start);    // get double string
 
-                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                            pos++;
+                        if (skipafter)
+                        {
+                            while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                                pos++;
+                        }
 
                         if (System.Numerics.BigInteger.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out System.Numerics.BigInteger bv))
                             return new JToken(JToken.TType.BigInt,sign ? -bv : bv);
@@ -256,8 +284,11 @@ namespace QuickJSON.Utils
                         if (pos == start)   // this means no chars, caused by a - nothing
                             return null;
 
-                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                            pos++;
+                        if (skipafter)
+                        {
+                            while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                                pos++;
+                        }
 
                         if (ulv <= long.MaxValue)
                             return new JToken(JToken.TType.Long, sign ? -(long)ulv : (long)ulv);
@@ -275,6 +306,36 @@ namespace QuickJSON.Utils
                     ulv = (ulv * 10) + (ulong)(line[pos++] - '0');
                 }
             }
+        }
+
+
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextCharBlock(char[], Func{char, bool,bool})"/>
+        public int NextCharBlock(char[] buffer, Func<char, bool> test, bool skipafter = true)
+        {
+            if ( pos < Line.Length)
+            {
+                int i = 0;
+                while (test(line[pos]))         // if we want it
+                {
+                    if (i >= buffer.Length)     // if we are out of buffer space error
+                        return -1;
+
+                    buffer[i++] = line[pos++];
+
+                    if (pos == Line.Length)     // if we are out of data, error
+                        return -1;
+                }
+
+                if ( skipafter )
+                {
+                    while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                        pos++;
+                }
+
+                return i;
+            }
+
+            return -1;
         }
 
         #endregion

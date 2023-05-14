@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2021 robbyxp1 @ github.com
+ * Copyright © 2021-2023 robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -59,6 +59,28 @@ namespace QuickJSON.Utils
             }
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.GetNextNonSpaceChar"/>
+        public char GetNextNonSpaceChar(bool skipspacesafter = true)
+        {
+            SkipSpace();
+
+            if (pos < length)
+                return line[pos++];
+            else
+            {
+                Reload();
+                if (pos < length)
+                {
+                    char ret = line[pos++];
+                    if ( skipspacesafter )
+                        SkipSpace();
+                    return ret;
+                }
+                else
+                    return char.MinValue;
+            }
+        }
+
         /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.PeekChar"/>
         public char PeekChar()
         {
@@ -108,7 +130,7 @@ namespace QuickJSON.Utils
         }
 
         /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.IsCharMoveOn(char, bool)"/>
-        public bool IsCharMoveOn(char t, bool skipspace = true)
+        public bool IsCharMoveOn(char t, bool skipspaceafter = true)
         {
             if (pos == length)                          // if at end, reload
                 Reload();
@@ -116,7 +138,7 @@ namespace QuickJSON.Utils
             if (pos < length && line[pos] == t)
             {
                 pos++;
-                if (skipspace)
+                if (skipspaceafter)
                     SkipSpace();
                 return true;
             }
@@ -130,8 +152,8 @@ namespace QuickJSON.Utils
             pos--;
         }
 
-        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextQuotedString(char, char[], bool)"/>
-        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false)
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextQuotedString(char, char[], bool, bool)"/>
+        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false, bool skipafter = true)
         {
             int bpos = 0;
 
@@ -148,7 +170,8 @@ namespace QuickJSON.Utils
                 {
                     pos++; //skip end quote
 
-                    SkipSpace();
+                    if ( skipafter)
+                        SkipSpace();
 
                     return bpos;
                 }
@@ -219,9 +242,11 @@ namespace QuickJSON.Utils
 
         static char[] decchars = new char[] { '.', 'e', 'E', '+', '-' };
 
-        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.JNextNumber(bool)"/>
-        public JToken JNextNumber(bool sign)     // must be on a digit
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.JNextNumber(bool,bool)"/>
+        public JToken JNextNumber(bool sign, bool skipafter = true)     
         {
+            // must be on a digit
+
             ulong ulv = 0;
             bool bigint = false;
             int start = pos;
@@ -229,7 +254,7 @@ namespace QuickJSON.Utils
 
             while (true)
             {
-                if (pos == line.Length)
+                if (pos == line.Length)     // if at end of loaded text
                 {
                     System.Diagnostics.Debug.Assert(slid == false);         // must not slide more than once
                     Reload(start);              // get more data, keeping d  back to start
@@ -244,7 +269,8 @@ namespace QuickJSON.Utils
 #if JSONBIGINT
                         string part = new string(line, start, pos - start);    // get double string
 
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
 
                         if (System.Numerics.BigInteger.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out System.Numerics.BigInteger bv))
                             return new JToken(JToken.TType.BigInt, sign ? -bv : bv);
@@ -283,7 +309,8 @@ namespace QuickJSON.Utils
 
                         string part = new string(line, start, pos - start);    // get double string
 
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
 
                         if (double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double dv))
                             return new JToken(JToken.TType.Double, sign ? -dv : dv);
@@ -295,7 +322,8 @@ namespace QuickJSON.Utils
 #if JSONBIGINT
                         string part = new string(line, start, pos - start);    // get double string
 
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
 
                         if (System.Numerics.BigInteger.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out System.Numerics.BigInteger bv))
                             return new JToken(JToken.TType.BigInt, sign ? -bv : bv);
@@ -308,7 +336,8 @@ namespace QuickJSON.Utils
                         if (pos == start)   // this means no chars, caused by a - nothing
                             return null;
 
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
 
                         if (ulv <= long.MaxValue)
                             return new JToken(JToken.TType.Long, sign ? -(long)ulv : (long)ulv);
@@ -327,6 +356,36 @@ namespace QuickJSON.Utils
                 }
             }
         }
+
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextCharBlock(char[], Func{char, bool,bool})"/>
+        public int NextCharBlock(char[] buffer, Func<char, bool> test, bool skipafter = true)
+        {
+            int bpos = 0;
+
+            while (true)
+            {
+                if (pos == line.Length)     // if out of chars, reload
+                    Reload();
+
+                if (pos == line.Length || bpos == buffer.Length)  // if reached end of line, or out of buffer, error
+                {
+                    return -1;
+                }
+
+                if (test(line[pos]))        // if ok, store
+                {
+                    buffer[bpos++] = line[pos++];
+                }
+                else
+                {
+                    if (skipafter)
+                        SkipSpace();
+
+                    return bpos;
+                }
+            }
+        }
+
 
         private bool Reload(int from = -1)          // from means keep at this position onwards, default is pos.
         {

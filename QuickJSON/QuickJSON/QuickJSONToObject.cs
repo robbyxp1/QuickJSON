@@ -105,7 +105,7 @@ namespace QuickJSON
         /// Use the default plus DeclaredOnly for only members of the top class only </param>
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
-        /// <exception cref="System.Exception"> Generic exception
+        /// <exception cref="System.Exception"> Generic exception</exception>
         /// <exception cref="System.InvalidCastException"> If a type failure occurs.  Other excepections could also occur.
         /// </exception>
         public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors, bool checkcustomattr,
