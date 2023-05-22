@@ -357,7 +357,63 @@ namespace QuickJSON.Utils
             }
         }
 
-        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextCharBlock(char[], Func{char, bool,bool})"/>
+        static JToken jendarray = new JToken(JToken.TType.EndArray);
+
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.JNextValue(char[], bool)"/>
+        public JToken JNextValue(char[] buffer, bool inarray)
+        {
+            //System.Diagnostics.Debug.WriteLine("Decode at " + p.LineLeft);
+            char next = GetChar();
+            switch (next)
+            {
+                case '{':
+                    SkipSpace();
+                    return new JObject();
+
+                case '[':
+                    SkipSpace();
+                    return new JArray();
+
+                case '"':
+                    int textlen = NextQuotedString(next, buffer, true);
+                    return textlen >= 0 ? new JToken(JToken.TType.String, new string(buffer, 0, textlen)) : null;
+
+                case ']':
+                    if (inarray)
+                    {
+                        SkipSpace();
+                        return jendarray;
+                    }
+                    else
+                        return null;
+
+                case '0':       // all positive. JSON does not allow a + at the start (integer fraction exponent)
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                    BackUp();
+                    return JNextNumber(false);
+                case '-':
+                    return JNextNumber(true);
+                case 't':
+                    return IsStringMoveOn("rue") ? new JToken(JToken.TType.Boolean, true) : null;
+                case 'f':
+                    return IsStringMoveOn("alse") ? new JToken(JToken.TType.Boolean, false) : null;
+                case 'n':
+                    return IsStringMoveOn("ull") ? new JToken(JToken.TType.Null) : null;
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.NextCharBlock(char[], Func{char, bool}, bool)"/>
         public int NextCharBlock(char[] buffer, Func<char, bool> test, bool skipafter = true)
         {
             int bpos = 0;
@@ -386,6 +442,34 @@ namespace QuickJSON.Utils
             }
         }
 
+        /// <inheritdoc cref="QuickJSON.Utils.IStringParserQuick.ChecksumCharBlock(Func{char, bool}, bool)"/>
+        public uint ChecksumCharBlock(Func<char, bool> test, bool skipafter = true)
+        {
+            uint checksum = 0;
+
+            while (true)
+            {
+                if (pos == line.Length)     // if out of chars, reload
+                    Reload();
+
+                if (pos == line.Length)  // if reached end of line, checksum
+                {
+                    return Math.Max(1, checksum);
+                }
+
+                if (test(line[pos]))        // if ok, store
+                {
+                    checksum += 7 + (uint)line[pos++] * 23;
+                }
+                else
+                {
+                    if (skipafter)
+                        SkipSpace();
+
+                    return Math.Max(1, checksum);
+                }
+            }
+        }
 
         private bool Reload(int from = -1)          // from means keep at this position onwards, default is pos.
         {
@@ -410,6 +494,7 @@ namespace QuickJSON.Utils
 
             return length > 0;
         }
+
 
         private TextReader tr;
         private char[] line;

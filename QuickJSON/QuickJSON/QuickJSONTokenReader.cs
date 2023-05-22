@@ -95,7 +95,7 @@ namespace QuickJSON
             {
                 parser.SkipSpace();
 
-                JToken o = DecodeValue(parser, textbuffer, false);       // grab new value, not array end
+                JToken o = parser.JNextValue(textbuffer, false);       // grab new value, not array end
 
                 if (o == null)
                 {
@@ -169,7 +169,7 @@ namespace QuickJSON
                             {
                                 string name = new string(textbuffer, 0, textlen);
 
-                                JToken o = DecodeValue(parser, textbuffer, false);      // get value
+                                JToken o = parser.JNextValue(textbuffer, false);      // get value
 
                                 if (o == null)
                                 {
@@ -236,7 +236,7 @@ namespace QuickJSON
                 {
                     while (true)
                     {
-                        JToken o = DecodeValue(parser, textbuffer, true);       // grab new value
+                        JToken o = parser.JNextValue(textbuffer, true);       // grab new value
 
                         if (o == null)
                         {

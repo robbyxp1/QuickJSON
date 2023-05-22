@@ -17,6 +17,7 @@
 using NFluent;
 using NUnit.Framework;
 using QuickJSON;
+using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -299,5 +300,215 @@ namespace JSONTests
                 }
             }
         }
+
+        [Test]
+        public void JSONTextReaderIntTest()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("{");
+            for (long entry = 0; entry < 5000000; entry++)
+                sb.Append($"\"count{entry}\":{entry * 23}, ");
+            sb.Append("}");
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            for (int i = 0; i < 1; i++)
+            {
+                //System.Diagnostics.Trace.WriteLine($"Loop {i}");
+                using (StringReader sr = new StringReader(sb.ToString()))         // read directly from file..
+                {
+                    var sq = new StringParserQuickTextReader(sr, 16384);
+                    char[] buf = new char[16384];
+
+                    int entry = 0;
+
+                    char ch;
+                    while ((ch = sq.GetChar()) > char.MinValue)
+                    {
+                        if (ch == '{')
+                        {
+                            while ((ch = sq.GetNextNonSpaceChar(false)) == '"')
+                            {
+                                var cc = sq.NextQuotedString('"', buf);
+
+                                if (cc > 0 && sq.IsCharMoveOn(':'))
+                                {
+                                    cc = sq.NextCharBlock(buf, (x) => char.IsDigit(x) || x == '-');
+                                    if (cc > 0)
+                                    {
+                                        var svalue = new string(buf, 0, cc);
+                                        if (long.TryParse(svalue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out long lv))
+                                            System.Diagnostics.Debug.Assert(lv == entry * 23);
+                                        else
+                                            System.Diagnostics.Debug.Assert(false);
+
+                                        entry++;
+                                        //string s = new string(buf, 0, cc); System.Diagnostics.Debug.WriteLine($"value {s}");
+
+                                        sq.IsCharMoveOn(',');
+                                    }
+                                    else
+                                        System.Diagnostics.Debug.Assert(false);
+                                }
+                                else
+                                    System.Diagnostics.Debug.Assert(false);
+                            }
+
+                            System.Diagnostics.Debug.Assert(ch == '}');
+
+                        }
+                    }
+                }
+            }
+
+            // with 5e6 seen 2350ms
+            System.Diagnostics.Trace.WriteLine($"Time {sw.ElapsedMilliseconds}");
+        }
+
+        [Test]
+        public void JSONTextReaderJValueTest()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("{");
+            for (long entry = 0; entry < 5000000; entry++)
+                sb.Append($"\"count{entry}\":{entry * 23}, ");
+            sb.Append("}");
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            for (int i = 0; i < 1; i++)
+            {
+                //System.Diagnostics.Trace.WriteLine($"Loop {i}");
+                using (StringReader sr = new StringReader(sb.ToString()))         // read directly from file..
+                {
+                    var sq = new StringParserQuickTextReader(sr, 16384);
+                    char[] buf = new char[16384];
+
+                    int entry = 0;
+
+                    char ch;
+                    while ((ch = sq.GetChar()) > char.MinValue)
+                    {
+                        if (ch == '{')
+                        {
+                            while ((ch = sq.GetNextNonSpaceChar(false)) == '"')
+                            {
+                                var cc = sq.NextQuotedString('"', buf);
+
+                                if (cc > 0 && sq.IsCharMoveOn(':'))
+                                {
+                                    JToken tk = sq.JNextNumber(false);
+                                    Check.That(tk != null && tk.IsLong && (long)tk == entry * 23).IsTrue();
+                                    entry++;
+                                    sq.IsCharMoveOn(',');
+                                }
+                                else
+                                    System.Diagnostics.Debug.Assert(false);
+                            }
+
+                            System.Diagnostics.Debug.Assert(ch == '}');
+
+                        }
+                    }
+                }
+            }
+
+            System.Diagnostics.Trace.WriteLine($"Time {sw.ElapsedMilliseconds}");
+        }
+
+        [Test]
+        public void JSONTextReaderCharBlock()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("{");
+            for (long entry = 0; entry < 100; entry++)
+                sb.Append($"\"count\":{entry * 23}, ");
+            sb.Append("}");
+
+            var chkcount = QuickJSON.Utils.Extensions.Checksum("count");
+
+            for (int i = 0; i < 1; i++)
+            {
+                //System.Diagnostics.Trace.WriteLine($"Loop {i}");
+                using (StringReader sr = new StringReader(sb.ToString()))         // read directly from file..
+                {
+                    var sq = new StringParserQuickTextReader(sr, 16384);
+                    char[] buf = new char[16384];
+
+                    int entry = 0;
+
+                    char ch;
+                    while ((ch = sq.GetChar()) > char.MinValue)
+                    {
+                        if (ch == '{')
+                        {
+                            while ((ch = sq.GetNextNonSpaceChar(false)) == '"')
+                            {
+                                var checksum = sq.ChecksumCharBlock((xa) => xa != '"');
+
+                                if (checksum == chkcount && sq.IsCharMoveOn('"') && sq.IsCharMoveOn(':'))
+                                {
+                                    JToken tk = sq.JNextNumber(false);
+                                    Check.That(tk != null && tk.IsLong && (long)tk == entry * 23).IsTrue();
+                                    entry++;
+                                    sq.IsCharMoveOn(',');
+                                }
+                                else
+                                    System.Diagnostics.Debug.Assert(false);
+                            }
+
+                            System.Diagnostics.Debug.Assert(ch == '}');
+
+                        }
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void JSONStringReaderCharBlock()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("{");
+            for (long entry = 0; entry < 100; entry++)
+                sb.Append($"\"count\":{entry * 23}, ");
+            sb.Append("}");
+
+            var chkcount = QuickJSON.Utils.Extensions.Checksum("count");
+
+            for (int i = 0; i < 1; i++)
+            {
+                {
+                    var sq = new StringParserQuick(sb.ToString());
+                    int entry = 0;
+
+                    char ch;
+                    while ((ch = sq.GetChar()) > char.MinValue)
+                    {
+                        if (ch == '{')
+                        {
+                            while ((ch = sq.GetNextNonSpaceChar(false)) == '"')
+                            {
+                                var checksum = sq.ChecksumCharBlock((xa) => xa != '"');
+
+                                if (checksum == chkcount && sq.IsCharMoveOn('"') && sq.IsCharMoveOn(':'))
+                                {
+                                    JToken tk = sq.JNextNumber(false);
+                                    Check.That(tk != null && tk.IsLong && (long)tk == entry * 23).IsTrue();
+                                    entry++;
+                                    sq.IsCharMoveOn(',');
+                                }
+                                else
+                                    System.Diagnostics.Debug.Assert(false);
+                            }
+
+                            System.Diagnostics.Debug.Assert(ch == '}');
+
+                        }
+                    }
+                }
+            }
+        }
+
     }
-}
+} 

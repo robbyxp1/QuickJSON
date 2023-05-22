@@ -167,7 +167,7 @@ namespace QuickJSON
 
             // first decode the first value/object/array
             {
-                JToken o = DecodeValue(parser, textbuffer, false);       // grab new value, not array end
+                JToken o = parser.JNextValue(textbuffer, false);       // grab new value, not array end
 
                 if (o == null)
                 {
@@ -240,7 +240,7 @@ namespace QuickJSON
                             {
                                 string name = new string(textbuffer, 0, textlen);
 
-                                JToken o = DecodeValue(parser, textbuffer, false);      // get value
+                                JToken o = parser.JNextValue(textbuffer, false);      // get value
 
                                 if (o == null)
                                 {
@@ -306,7 +306,7 @@ namespace QuickJSON
                 {
                     while (true)
                     {
-                        JToken o = DecodeValue(parser, textbuffer, true);       // grab new value
+                        JToken o = parser.JNextValue(textbuffer, true);       // grab new value
 
                         if (o == null)
                         {
@@ -402,63 +402,6 @@ namespace QuickJSON
             }
         }
 
-        static JToken jendarray = new JToken(TType.EndArray);
-
-        // return JObject, JArray, jendarray indicating end array if inarray is set, string, long, ulong, bigint, true, false, JNull
-        // null if unhappy
-
-        static private JToken DecodeValue(IStringParserQuick parser, char[] textbuffer, bool inarray)
-        {
-            //System.Diagnostics.Debug.WriteLine("Decode at " + p.LineLeft);
-            char next = parser.GetChar();
-            switch (next)
-            {
-                case '{':
-                    parser.SkipSpace();
-                    return new JObject();
-
-                case '[':
-                    parser.SkipSpace();
-                    return new JArray();
-
-                case '"':
-                    int textlen = parser.NextQuotedString(next, textbuffer, true);
-                    return textlen >= 0 ? new JToken(TType.String, new string(textbuffer, 0, textlen)) : null;
-
-                case ']':
-                    if (inarray)
-                    {
-                        parser.SkipSpace();
-                        return jendarray;
-                    }
-                    else
-                        return null;
-
-                case '0':       // all positive. JSON does not allow a + at the start (integer fraction exponent)
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9':
-                    parser.BackUp();
-                    return parser.JNextNumber(false);
-                case '-':
-                    return parser.JNextNumber(true);
-                case 't':
-                    return parser.IsStringMoveOn("rue") ? new JToken(TType.Boolean, true) : null;
-                case 'f':
-                    return parser.IsStringMoveOn("alse") ? new JToken(TType.Boolean, false) : null;
-                case 'n':
-                    return parser.IsStringMoveOn("ull") ? new JToken(TType.Null) : null;
-
-                default:
-                    return null;
-            }
-        }
 
         static private string GenErrorString(IStringParserQuick parser, string text)
         {

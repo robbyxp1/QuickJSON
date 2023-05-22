@@ -248,5 +248,16 @@ namespace QuickJSON.Utils
         {
             return "\"" + obj.Replace("\"", "\\\"") + "\"";
         }
+
+        public static uint Checksum(this string s)
+        {
+            uint checksum = 0;
+
+            foreach (var ch in s)
+            {
+                checksum += 7 + (uint)ch * 23;
+            }
+            return Math.Max(1, checksum);
+        }
     }
 }

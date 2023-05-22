@@ -44,6 +44,7 @@ namespace QuickJSON.Utils
         bool IsCharMoveOn(char t, bool skipspaceafter = true);
         /// <summary> Backup one position </summary>
         void BackUp();
+
         /// <summary> Get the next quoted string into buffer. Quote has already been removed. </summary>
         /// <param name="quote">Quote character to stop on </param>
         /// <param name="buffer">Buffer to place string into </param>
@@ -51,16 +52,30 @@ namespace QuickJSON.Utils
         /// <param name="skipafter">True to skip spaces after the string ends</param>
         /// <returns>Number of characters in buffer. -1 if it runs out of store buffer space or reached end of data</returns>
         int NextQuotedString(char quote, char[] buffer, bool replaceescape = false, bool skipafter = true);
+
         /// <summary> Read next number: long, ulong, bigint or double.</summary>
         /// <param name="sign">True if negative.  Sign has been removed</param>
         /// <param name="skipafter">True to skip spaces after the string ends</param>
         /// <returns>New JToken of number, Long, BigInt or Double. Null if failed</returns>
         JToken JNextNumber(bool sign, bool skipafter = true);
-        /// <summary> Read characters while predate is true.</summary>
+
+        /// <summary> Read next value : bool, string, number: long, ulong, bigint or double.  Then skip on</summary>
+        /// <param name="buffer">Buffer to place string into</param>
+        /// <param name="inarray">True if in a json array</param>
+        /// <returns>New JToken of number, Long, BigInt or Double. Null if failed</returns>
+        JToken JNextValue(char[] buffer, bool inarray);
+
+        /// <summary> Read next token.</summary>
         /// <param name="buffer">Buffer to place string into </param>
         /// <param name="test">Test character, if true, accept it and continue</param>
         /// <param name="skipafter">True to skip spaces after the block ends</param>
         /// <returns>Number of characters in buffer. -1 if it runs out of buffer space</returns>
         int NextCharBlock(char[] buffer, System.Func<char, bool> test, bool skipafter = true);
+
+        /// <summary> produce a checksum on the next char block</summary>
+        /// <param name="test">Test character, if true, accept it and continue</param>
+        /// <param name="skipafter">True to skip spaces after the block ends</param>
+        /// <returns>Checksum, 0 if no chars</returns>
+        uint ChecksumCharBlock(System.Func<char, bool> test, bool skipafter = true);
     }
 }
