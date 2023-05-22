@@ -17,12 +17,17 @@ using System;
 using System.Linq;
 using System.Reflection;
 
-#pragma warning disable 1591
 
 namespace QuickJSON.Utils
 {
+    /// <summary>
+    /// Extension class helpers for JSON system.
+    /// </summary>
+
     public static class Extensions
     {
+
+        /// <summary> Date helper function </summary>
         public static string ToStringZulu(this DateTime dt)     // zulu warrior format web style
         {
             if (dt.Millisecond != 0)
@@ -32,88 +37,109 @@ namespace QuickJSON.Utils
 
         }
 
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this int v)
         {
             return v.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this int v, string format)
         {
             return v.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this uint v)
         {
             return v.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this uint v, string format)
         {
             return v.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this long v)
         {
             return v.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this long v, string format)
         {
             return v.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this ulong v)
         {
             return v.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this ulong v, string format)
         {
             return v.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function - return 1 or 0 </summary>
         public static string ToStringIntValue(this bool v)
         {
             return v ? "1" : "0";
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this bool? v)
         {
             return (v.HasValue) ? (v.Value ? "1" : "0") : "";
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this double v, string format)
         {
             return v.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this double v)
         {
             return v.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this float v, string format)
         {
             return v.ToString(format, System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this float v)
         {
             return v.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this double? v, string format)
         {
             return (v.HasValue) ? v.Value.ToString(format, System.Globalization.CultureInfo.InvariantCulture) : "";
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this float? v, string format)
         {
             return (v.HasValue) ? v.Value.ToString(format, System.Globalization.CultureInfo.InvariantCulture) : "";
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this int? v)
         {
             return (v.HasValue) ? v.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this int? v, string format)
         {
             return (v.HasValue) ? v.Value.ToString(format, System.Globalization.CultureInfo.InvariantCulture) : "";
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this long? v)
         {
             return (v.HasValue) ? v.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
         }
+        /// <summary> Number helper function </summary>
         public static string ToStringInvariant(this long? v, string format)
         {
             return (v.HasValue) ? v.Value.ToString(format, System.Globalization.CultureInfo.InvariantCulture) : "";
         }
 
 
+        /// <summary> Approximate equal </summary>
         public static bool ApproxEquals(this double left, double right, double epsilon = 2.2204460492503131E-16)       // fron newtonsoft JSON, et al, calculate relative epsilon and compare
         {
             if (left == right)
@@ -127,6 +153,7 @@ namespace QuickJSON.Utils
             return (-tolerance < difference && tolerance > difference);
         }
 
+        /// <summary> Change value to type </summary>
         public static Object ChangeTo(this Type type, Object value)     // this extends ChangeType to handle nullables.
         {
             Type underlyingtype = Nullable.GetUnderlyingType(type);     // test if its a nullable type (double?)
@@ -143,6 +170,7 @@ namespace QuickJSON.Utils
             }
         }
 
+        /// <summary> Set value in member </summary>
         public static bool SetValue(this MemberInfo mi, Object instance, Object value)   // given a member of fields/property, set value in instance
         {
             if (mi.MemberType == System.Reflection.MemberTypes.Field)
@@ -166,6 +194,7 @@ namespace QuickJSON.Utils
                 throw new NotSupportedException();
         }
 
+        /// <summary> Get Type of field property </summary>
         static public Type FieldPropertyType(this MemberInfo mi)        // from member info for properties/fields return type
         {
             if (mi.MemberType == System.Reflection.MemberTypes.Property)
@@ -176,6 +205,7 @@ namespace QuickJSON.Utils
                 return null;
         }
 
+        /// <summary> Escape control characters </summary>
         public static string EscapeControlCharsFull(this string obj)        // unicode points not escaped out
         {
             string s = obj.Replace(@"\", @"\\");        // \->\\
@@ -188,6 +218,7 @@ namespace QuickJSON.Utils
             return s;
         }
 
+        /// <summary> Append and escape control characters </summary>
         public static System.Text.StringBuilder AppendEscapeControlCharsFull(this System.Text.StringBuilder str, string s)
         {
             foreach (var c in s)
@@ -212,6 +243,7 @@ namespace QuickJSON.Utils
             return str;
         }
 
+        /// <summary> Convert character to hex value </summary>
         static public int? ToHex(this char c)
         {
             if (char.IsDigit(c))
@@ -224,6 +256,7 @@ namespace QuickJSON.Utils
                 return null;
         }
 
+        /// <summary> Change wildcard to Reg Ex Wildcard </summary>
         public static string RegExWildCardToRegular(this string value)
         {
             if (value.Contains("*") || value.Contains("?"))
@@ -232,23 +265,14 @@ namespace QuickJSON.Utils
                 return "^" + value + ".*$";
         }
 
+        /// <summary> Perform wild card Reg Ex </summary>
         public static bool WildCardMatch(this string value, string match, bool caseinsensitive = false)
         {
             match = match.RegExWildCardToRegular();
             return System.Text.RegularExpressions.Regex.IsMatch(value, match, caseinsensitive ? System.Text.RegularExpressions.RegexOptions.IgnoreCase : System.Text.RegularExpressions.RegexOptions.None);
         }
 
-        public static string NewLine(this string s)
-        {
-            if (s.Length > 0 && !s.EndsWith(Environment.NewLine))
-                s += Environment.NewLine;
-            return s;
-        }
-        public static string AlwaysQuoteString(this string obj)
-        {
-            return "\"" + obj.Replace("\"", "\\\"") + "\"";
-        }
-
+        /// <summary> Calculate a String parser CheckSumCharBlock value </summary>
         public static uint Checksum(this string s)
         {
             uint checksum = 0;
@@ -259,5 +283,6 @@ namespace QuickJSON.Utils
             }
             return Math.Max(1, checksum);
         }
+
     }
 }

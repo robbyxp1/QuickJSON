@@ -59,20 +59,20 @@ namespace QuickJSON.Utils
         /// <returns>New JToken of number, Long, BigInt or Double. Null if failed</returns>
         JToken JNextNumber(bool sign, bool skipafter = true);
 
-        /// <summary> Read next value : bool, string, number: long, ulong, bigint or double.  Then skip on</summary>
+        /// <summary> Read next token value from string then skip on</summary>
         /// <param name="buffer">Buffer to place string into</param>
         /// <param name="inarray">True if in a json array</param>
-        /// <returns>New JToken of number, Long, BigInt or Double. Null if failed</returns>
+        /// <returns>New JToken of string, Long, ULong, BigInt or Double, Bool. Null if failed</returns>
         JToken JNextValue(char[] buffer, bool inarray);
 
-        /// <summary> Read next token.</summary>
+        /// <summary> Read a character block.</summary>
         /// <param name="buffer">Buffer to place string into </param>
-        /// <param name="test">Test character, if true, accept it and continue</param>
+        /// <param name="test">Test function, if true, accept it, else stop here (without removing it)</param>
         /// <param name="skipafter">True to skip spaces after the block ends</param>
         /// <returns>Number of characters in buffer. -1 if it runs out of buffer space</returns>
         int NextCharBlock(char[] buffer, System.Func<char, bool> test, bool skipafter = true);
 
-        /// <summary> produce a checksum on the next char block</summary>
+        /// <summary> Calculate a checksum on the next char block. </summary>
         /// <param name="test">Test character, if true, accept it and continue</param>
         /// <param name="skipafter">True to skip spaces after the block ends</param>
         /// <returns>Checksum, 0 if no chars</returns>

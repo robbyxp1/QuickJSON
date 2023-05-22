@@ -400,7 +400,6 @@ namespace QuickJSON.Utils
 
             if (pos < Line.Length)
             {
-                int i = 0;
                 while (test(line[pos]))         // if we want it
                 {
                     checksum += 7 + (uint)line[pos++] * 23;
