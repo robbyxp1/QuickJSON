@@ -21,7 +21,9 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>1.1 
+    <PackageReleaseNotes>1.2
+Improved string parser with more functionality for use by discrete parser implementations
+1.1 
 ToObject and FromObject gets better handling of IEnumerations, so HashSet can be handled
 1.01
 Upload to Nuget had wrong dll - try again
@@ -35,11 +37,11 @@ DoubleNull and FloatNull added</PackageReleaseNotes>
 Designed for speed and compactness.
 Code can be XCOPYED into your project to avoid DLL dependencies.
 </Description>
-    <Copyright>(C) robbyxp @ gihub.com</Copyright>
+    <Copyright>(C) robbyxp @ gihub.com  2023</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.1</Version>
-    <AssemblyVersion>1.1.0.0</AssemblyVersion>
-    <FileVersion>1.1.0.0</FileVersion>
+    <Version>1.2</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net5.0|AnyCPU'">
