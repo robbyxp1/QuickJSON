@@ -350,17 +350,17 @@ namespace QuickJSON
             }
             else
             {
-                string name = converttype.Name;                              // compare by name quicker than is
+                string name = converttype.Name;                         // compare by name quicker than is
 
-                if (name.Equals("Nullable`1"))                      // nullable types
+                if (name.Equals("Nullable`1"))                          // nullable types
                 {
                     if (token.IsNull)
                         return null;
 
-                    name = converttype.GenericTypeArguments[0].Name;         // get underlying type..
+                    name = converttype.GenericTypeArguments[0].Name;    // get underlying type..
                 }
 
-                if (name.Equals("String"))                          // copies of QuickJSON explicit operators in QuickJSON.cs
+                if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                 {
                     if (token.IsNull)
                         return null;
@@ -454,6 +454,10 @@ namespace QuickJSON
                         System.Diagnostics.Debug.WriteLine($"JSONToObject: Unrecognised value '{token.Str()}' for enum {converttype.Name}");
                         return new ToObjectError($"JSONToObject: Unrecognised value '{token.Str()}' for enum {converttype.Name}");
                     }
+                }
+                else if (name.Equals("Object"))                     // catch all, june 7/6/23 fix
+                {
+                    return token.Value;
                 }
 
                 return new ToObjectError("JSONToObject: Bad Conversion " + token.TokenType + " to " + converttype.Name);

@@ -865,6 +865,35 @@ namespace JSONTests
         public void JSONToObject()
         {
             {
+                string json = @"{
+                              ""GD"":true,
+                              ""SDD"":true,
+                              ""TPD"":true,
+                              ""TPSD"":""2014 - 12 - 16T00: 00:00Z"",
+                              ""TPSDE"":false,
+                              ""TPED"":""2023 - 07 - 07T16: 34:45.608Z"",
+                              ""TPEDE"":false,
+                              ""GALOD"":true,
+                              ""GALOBJLIST"":"" +,+,+,+,+,+,+,+,+,+,+,+,+,+,+,+,+,+,+,+,+,+,"",
+                              ""ERe"":true,
+                              ""ERoe"":true,
+                              ""ERse"":true,
+                              ""ERte"":true,
+                              ""ELe"":false,
+                              ""ELoe"":true,
+                              ""ELse"":true,
+                              ""ELte"":true,
+                              ""POSCAMERA"":""306.4375,59.21875,11198.63,306.4375,63.09071,11195.46,0""
+                                }";
+
+                Dictionary<string, Object> dict;
+
+                JToken tk = JToken.Parse(json);
+                dict = tk.ToObject<Dictionary<string, Object>>();
+                Check.That(dict.Count == tk.Count);
+            }
+
+            {
                 Dictionary<string, int> s1 = new Dictionary<string, int>() { ["one"] = 1, ["two"] = 2, ["three"] = 3 };
                 JToken t1 = JToken.FromObject(s1);
                 Check.That(t1).IsNotNull();
