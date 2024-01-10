@@ -1,18 +1,16 @@
 ﻿/*
-* Copyright © 2018 EDDiscovery development team
-*
-* Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
-* file except in compliance with the License. You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-* 
-* Unless required by applicable law or agreed to in writing, software distributed under
-* the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
-* ANY KIND, either express or implied. See the License for the specific language
-* governing permissions and limitations under the License.
-* 
-* EDDiscovery is not affiliated with Frontier Developments plc.
-*/
+ * Copyright © 2021-2023 Robbyxp1 @ github.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
+ * ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
 
 using NFluent;
 using NUnit.Framework;
@@ -223,7 +221,9 @@ namespace JSONTests
     ""ArrayValue"":[1,2,3],
     ""Category"":null,
     ""QValue"":null,
-    ""PropGetSet"":1
+    ""PropGetSet"":1,
+    ""bodies"":{ ""a"":1, ""b"":2 },
+    ""arrays"":[ { ""a"":1, ""b"":2 } , { ""c"":1, ""d"":2 } ]
   },
   {
     ""Count"":0,
@@ -231,7 +231,9 @@ namespace JSONTests
     ""Name_Localised"":""This is a long string to try and make the thing break"",
     ""FriendlyName"":null,
     ""Category"":null,
-    ""QValue"":20
+    ""QValue"":20,
+    ""bodies"":{ ""a"":1, ""b"":2 },
+    ""arrays"":[ { ""a"":1, ""b"":2 } , { ""c"":1, ""d"":2 } ]
   }
 ]
 ";
@@ -249,6 +251,8 @@ namespace JSONTests
                             bool res = JToken.LoadTokens(enumerator);
                             Check.That(res).IsTrue();
                             Check.That(to["Category"]).IsNotNull();
+                            Check.That(to["bodies"].Object().Count).Equals(2);
+                            Check.That(to["arrays"].Array().Count).Equals(2);
                         }
                     }
                 }

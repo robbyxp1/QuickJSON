@@ -28,7 +28,23 @@ namespace QuickJSON
         /// <param name="stringliterals">true to output strings and key names without escaping or quoting</param>
         public static void ToStringBuilder(StringBuilder str, JToken token, string prepad, string postpad, string oapad, bool stringliterals)
         {
-            if (token.TokenType == TType.String)
+            int lastcr = 0;
+            ToStringBuilder(str, token, prepad, postpad, oapad, stringliterals, ref lastcr, int.MaxValue);
+        }
+
+        /// <summary> Convert to string using string builder</summary>
+        /// <param name="str">Stringbuilder to append to</param>
+        /// <param name="token">Token to convert</param>
+        /// <param name="prepad">Pad before token is outputted</param>
+        /// <param name="postpad">Pad after token is outputted</param>
+        /// <param name="oapad">Pad before objects or arrays are outputted</param>
+        /// <param name="stringliterals">true to output strings and key names without escaping or quoting</param>
+        /// <param name="lastcr">where last cr is. set to 0 to start</param>
+        /// <param name="maxlinelength">introduce new line between entries when exceeded this length</param>
+
+        public static void ToStringBuilder(StringBuilder str, JToken token, string prepad, string postpad, string oapad, bool stringliterals, ref int lastcr, int maxlinelength)
+        {
+                if (token.TokenType == TType.String)
             {
                 if (stringliterals)       // used if your extracting the value of the data as a string, and not turning it back to json.
                     str.Append(prepad).Append((string)token.Value).Append(postpad);
@@ -56,6 +72,12 @@ namespace QuickJSON
                 str.Append(prepad).Append("null").Append(postpad);
             else if (token.TokenType == TType.Array)
             {
+                if (str.Length - lastcr > maxlinelength)
+                {
+                    str.Append(System.Environment.NewLine);
+                    lastcr = str.Length;
+                }
+
                 str.Append(prepad).Append('[').Append(postpad);
 
                 string arrpad = prepad + oapad;
@@ -63,14 +85,27 @@ namespace QuickJSON
                 for (int i = 0; i < ja.Count; i++)
                 {
                     bool notlast = i < ja.Count - 1;
-                    ToStringBuilder(str, ja[i], arrpad, postpad, oapad, stringliterals);
+                    ToStringBuilder(str, ja[i], arrpad, postpad, oapad, stringliterals, ref lastcr, maxlinelength);
                     if (notlast)
                     {
                         str.Remove(str.Length - postpad.Length, postpad.Length);    // remove the postpad
                         str.Append(',').Append(postpad);
+
+                        if (str.Length - lastcr > maxlinelength)        // we don't cr at the last one, as we want the ] to be next
+                        {
+                            str.Append(System.Environment.NewLine);
+                            lastcr = str.Length;
+                        }
                     }
                 }
+
                 str.Append(prepad).Append(']').Append(postpad);
+
+                if (str.Length - lastcr > maxlinelength)
+                {
+                    str.Append(System.Environment.NewLine);
+                    lastcr = str.Length;
+                }
             }
             else if (token.TokenType == TType.Object)
             {
@@ -89,7 +124,7 @@ namespace QuickJSON
                         else
                             str.Append(objpad).Append('"').AppendEscapeControlCharsFull(e.Key).Append("\":").Append(postpad);
 
-                        ToStringBuilder(str,e.Value, objpad, postpad, oapad, stringliterals);
+                        ToStringBuilder(str,e.Value, objpad, postpad, oapad, stringliterals, ref lastcr, maxlinelength);
 
                         if (notlast)
                         {
@@ -99,19 +134,34 @@ namespace QuickJSON
                     }
                     else
                     {
+
                         if (stringliterals)
                             str.Append(objpad).Append(e.Key).Append(':');
                         else
                             str.Append(objpad).Append('"').AppendEscapeControlCharsFull(e.Key).Append("\":");
 
-                        ToStringBuilder(str, e.Value, "", "", oapad, stringliterals);
+                        ToStringBuilder(str, e.Value, "", "", oapad, stringliterals, ref lastcr, maxlinelength);
+
                         if (notlast)
                             str.Append(',');
+
                         str.Append(postpad);
+                    }
+
+                    if (notlast && str.Length - lastcr > maxlinelength)
+                    {
+                        str.Append(System.Environment.NewLine);
+                        lastcr = str.Length;
                     }
                 }
 
                 str.Append(prepad).Append('}').Append(postpad);
+
+                if (str.Length - lastcr > maxlinelength)
+                {
+                    str.Append(System.Environment.NewLine);
+                    lastcr = str.Length;
+                }
             }
             else if (token.TokenType == TType.Error)
                 str.Append("ERROR:" + (string)token.Value);

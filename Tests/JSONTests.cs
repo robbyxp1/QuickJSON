@@ -1,18 +1,16 @@
 ﻿/*
-* Copyright © 2018 EDDiscovery development team
-*
-* Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
-* file except in compliance with the License. You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-* 
-* Unless required by applicable law or agreed to in writing, software distributed under
-* the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
-* ANY KIND, either express or implied. See the License for the specific language
-* governing permissions and limitations under the License.
-* 
-* EDDiscovery is not affiliated with Frontier Developments plc.
-*/
+ * Copyright © 2021-2023 Robbyxp1 @ github.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
+ * file except in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software distributed under
+ * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
+ * ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
 
 using NFluent;
 using NUnit.Framework;
@@ -21,9 +19,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Web.UI.DataVisualization.Charting;
 using Tests;
 
 namespace JSONTests
@@ -41,6 +41,12 @@ namespace JSONTests
         [Test]
         public void JSONBasic()
         {
+            {
+                JObject jo = new JObject { ["one"] = "one", ["two"] = "two" };
+
+                Check.That(jo.Contains("one")).IsTrue();
+
+            }
             {
                 string jsonemptyobj = "  {   } ";
                 JToken decoded1 = JToken.Parse(jsonemptyobj);
@@ -946,6 +952,11 @@ namespace JSONTests
 
 
             {
+                // check the ToObject Datetime is invariant and handles zulu
+
+                var curcul = CultureInfo.CurrentCulture;
+                CultureInfo.CurrentCulture = System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo("de-de");
+
                 JToken t1 = JToken.Parse(@"{ ""one"":2929, ""two"":29, ""three"":32, ""four"":null, ""six"":606, ""seven"":1.1, ""eight"":true, ""nine"":9.9, ""ten"":""2020-02-01T00:00:00Z"",""eleven"":""2020-02-02T00:00:00Z"" }");
                 OtherTypes o1 = t1.ToObject<OtherTypes>();
                 Check.That(o1).IsNotNull();
@@ -960,6 +971,8 @@ namespace JSONTests
                 Check.That(o1.nine).Equals(9.9f);
                 Check.That(o1.ten).Equals(new DateTime(2020, 2, 1));
                 Check.That(o1.eleven).Equals(new DateTime(2020, 2, 2));
+
+                CultureInfo.CurrentCulture = System.Threading.Thread.CurrentThread.CurrentUICulture = curcul;
 
             }
             {
@@ -1271,11 +1284,48 @@ namespace JSONTests
             public string v2;
             public FromTest other2;
         }
+        class FromTest3
+        {
+            public int v1;
+            public string v2;
+            public DateTime dt;
+        }
 
         public class FromObjectTest
         {
             public TestEnum t1;
         }
+
+        public class ImageEntry
+        {
+            public bool Enabled { get; set; }
+            public string Name { get; set; }                // name given to it, for preselected ones only
+            public string ImagePathOrURL { get; set; }      // http:... or c:\ or Resource:<name>
+
+
+            [JsonIgnore(JsonIgnoreAttribute.Operation.Include, "X", "Y", "Z")]
+            public Point3D Centre { get; set; }
+            [JsonIgnore(JsonIgnoreAttribute.Operation.Ignore, "IsEmpty")]
+            public PointF Size { get; set; }
+            [JsonIgnore(JsonIgnoreAttribute.Operation.Include, "X", "Y", "Z")]
+            public Point3D RotationDegrees { get; set; }
+            public bool RotateToViewer { get; set; }
+            public bool RotateElevation { get; set; }
+            public float AlphaFadeScalar { get; set; }
+            public float AlphaFadePosition { get; set; }
+
+            public ImageEntry()
+            {
+            }
+            public ImageEntry(string name, string path, bool enabled, Point3D centre, PointF size, Point3D rotation,
+                                bool rotviewer = false, bool rotelevation = false, float alphafadescaler = 0, float alphafadepos = 1)
+            {
+                Name = name; ImagePathOrURL = path; Enabled = enabled; Centre = centre; Size = size; RotationDegrees = rotation;
+                RotateToViewer = rotviewer; RotateElevation = rotelevation; AlphaFadeScalar = alphafadescaler; AlphaFadePosition = alphafadepos;
+            }
+        }
+
+
 
         [Test]
         public void JSONFromObject()
@@ -1295,6 +1345,39 @@ namespace JSONTests
             //    TestEnum enumvalue = TestEnum.one;
             //   // JToken t = JToken.FromObject(dt);
             //}
+
+            if ( true ) // demonstrate removal of unwanted members by the new (sept 23) ignore or include operation
+            {
+                List<ImageEntry> ielist = new List<ImageEntry>
+                {
+                    new ImageEntry("A1","P1",true,new Point3D(1,2,3),new PointF(5,6),new Point3D(7,8,9)),
+                    new ImageEntry("A2", "P2", true, new Point3D(1, 2, 3), new PointF(5, 6), new Point3D(7, 8, 9)),
+                };
+
+                JArray json = JToken.FromObjectWithError(ielist,false,membersearchflags:System.Reflection.BindingFlags.Public|System.Reflection.BindingFlags.Instance).Array();
+
+                Check.That(json[0].Object()["Centre"].Object().Contains("PointF")).IsFalse();
+                Check.That(json[0].Object()["Centre"].Object().Contains("X")).IsTrue();
+                Check.That(json[0].Object()["Centre"].Object().Contains("Y")).IsTrue();
+                Check.That(json[0].Object()["Centre"].Object().Contains("Z")).IsTrue();
+                Check.That(json[0].Object()["Size"].Object().Contains("IsEmpty")).IsFalse();
+
+                var str = json.ToString(true);
+
+                var list = json.ToObject<List<ImageEntry>>();
+                Check.That(list).IsNotNull();
+                Check.That(list.Count).Equals(2);
+                Check.That(list[0].Centre).IsNotNull();
+                Check.That(list[0].Centre.X).IsEqualTo(1);
+                Check.That(list[0].Centre.Y).IsEqualTo(2);
+                Check.That(list[0].Centre.Z).IsEqualTo(3);
+                Check.That(list[0].Size.X).IsEqualTo(5);
+                Check.That(list[0].Size.Y).IsEqualTo(6);
+                Check.That(list[0].RotationDegrees.X).IsEqualTo(7);
+                Check.That(list[0].RotationDegrees.Y).IsEqualTo(8);
+                Check.That(list[0].RotationDegrees.Z).IsEqualTo(9);
+            }
+
 
             if ( true )
             {
@@ -1336,6 +1419,38 @@ namespace JSONTests
                 Check.That(t2["other1"]["v1"].Int()).Equals(20);                // check ignores self ref and does as much as possible
                 System.Diagnostics.Debug.WriteLine(t.Value.ToString());
             }
+
+            {
+                var dttest = new DateTime(2022, 12, 3, 20, 3, 4, 123, DateTimeKind.Utc);
+                var fm = new FromTest3() { v1 = 10, v2 = "Hello1", dt = dttest };
+                JObject t = JObject.FromObjectWithError(fm, false).Object();
+                Check.That(t["v1"].Long()).IsEqualTo(10);
+                Check.That(t["v2"].Str()).IsEqualTo("Hello1");
+                string str = t["dt"].Str();
+                Check.That(t["dt"].Str()).IsEqualTo("2022-12-03T20:03:04.123Z");
+
+            }
+
+            // prove that fromobject converts a date time to zulu under another culture
+            {
+                var curcul = CultureInfo.CurrentCulture;
+                CultureInfo.CurrentCulture = System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfo("de-de");
+                
+                
+                var dttest = new DateTime(2022, 12, 3, 20, 3, 4, 123, DateTimeKind.Utc);
+                var fm = new FromTest3() { v1 = 10, v2 = "Hello1", dt = dttest };
+                JObject t = JObject.FromObjectWithError(fm, false).Object();
+                Check.That(t["v1"].Long()).IsEqualTo(10);
+                Check.That(t["v2"].Str()).IsEqualTo("Hello1");
+                string str = t["dt"].Str();
+                Check.That(t["dt"].Str()).IsEqualTo("2022-12-03T20:03:04.123Z");
+
+                JToken tj = JToken.CreateToken(dttest);
+                Check.That(tj.Str()).IsEqualTo("2022-12-03T20:03:04.123Z");
+
+                CultureInfo.CurrentCulture = System.Threading.Thread.CurrentThread.CurrentUICulture = curcul;
+            }
+
 
             {
                 var mats = new Materials[2];

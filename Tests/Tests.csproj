@@ -45,6 +45,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Web.DataVisualization" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -54,18 +55,46 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions.cs" />
+    <Compile Include="JSONSchema.cs" />
     <Compile Include="JSONTextreader.cs" />
     <Compile Include="JSONTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="Resources\approachsettlement-v1.0.json" />
+    <None Include="Resources\blackmarket-v1.0.json" />
+    <None Include="Resources\codexentry-v1.0.json" />
+    <None Include="Resources\commodity-v3.0.json" />
+    <None Include="Resources\fcmaterials_capi-v1.0.json" />
+    <None Include="Resources\fcmaterials_journal-v1.0.json" />
+    <None Include="Resources\fssallbodiesfound-v1.0.json" />
+    <None Include="Resources\fssbodysignals-v1.0.json" />
+    <None Include="Resources\fssdiscoveryscan-v1.0.json" />
+    <None Include="Resources\fsssignaldiscovered-v1.0.json" />
+    <None Include="Resources\journal-v1.0.json" />
+    <None Include="Resources\navbeaconscan-v1.0.json" />
+    <None Include="Resources\navroute-v1.0.json" />
+    <None Include="Resources\outfitting-v2.0.json" />
+    <None Include="Resources\scanbarycentre-v1.0.json" />
+    <None Include="Resources\shipyard-v2.0.json" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\QuickJSON\QuickJSON.csproj">
       <Project>{e01ef657-ab86-4c3f-bfd9-0f06509262f6}</Project>
       <Name>QuickJSON</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

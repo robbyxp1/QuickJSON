@@ -80,6 +80,8 @@ namespace QuickJSON
         public bool IsULong { get { return TokenType == TType.ULong; } }
         /// <summary> Is the token a Real Number</summary>
         public bool IsDouble { get { return TokenType == TType.Double; } }
+        /// <summary> Is the token a Real or Integer Number</summary>
+        public bool IsNumber { get { return TokenType == TType.Double || TokenType == TType.Long || TokenType == TType.ULong || TokenType == TType.BigInt; } }
         /// <summary> Is the token a Boolean</summary>
         public bool IsBool { get { return TokenType == TType.Boolean; } }
         /// <summary> Is the token a JSON Array </summary>
@@ -506,6 +508,43 @@ namespace QuickJSON
                 return ((bool?)this) != null && ((bool)this).Equals((bool)value);
             else
                 return false;
+        }
+
+        /// <summary> Is this token equal to another tokens. For types incl double </summary>
+        public bool ValueEquals(JToken other)
+        {
+            if( Value is string)
+            {
+                if (other.IsString)
+                    return ((string)Value).Equals((string)other);
+            }
+            else if (Value is long)
+            {
+                if (other.IsLong || other.IsDouble)
+                    return ((long)Value).Equals((long)other);
+            }
+            else if (Value is ulong)
+            {
+                if (other.IsULong)
+                    return ((ulong)Value).Equals((ulong)other);
+            }
+            else if (Value is double)
+            {
+                if (other.IsNumber)
+                    return ((double)Value).Equals((double)other);
+            }
+            else if (Value is bool)
+            {
+                if (other.IsBool)
+                    return ((bool)Value).Equals((bool)other);
+            }
+            else if (TokenType == TType.Null)
+            {
+                if (other.TokenType == TType.Null)
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary> Return a copy of this JToken </summary>

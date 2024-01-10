@@ -359,10 +359,8 @@ namespace QuickJSON
                         if (!LoadTokens(enumerator))
                             return false;
                     }
-                    else
-                    {
-                        ja.Add(i);
-                    }
+
+                    ja.Add(i);
                 }
 
                 return false;

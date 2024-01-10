@@ -15,22 +15,46 @@
 using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace QuickJSON
 {
     /// <summary>
-    /// Ignore attribute. Attach to an member of a class to say don't serialise this item
+    /// Ignore attribute. Attach to an member of a class to say don't serialise this item or 
+    /// to exclude certain members or to only include specific members
     /// Applicable to FromObject and ToObject
     /// </summary>
     public sealed class JsonIgnoreAttribute : Attribute 
-    {                                                           
+    {
+        /// <summary> FromObject: If non null, list of object members to ignore completely</summary>
+        public string[] Ignore { get; set; }
+        /// <summary> FromObject: If non null, list of object members to include only</summary>
+        public string[] IncludeOnly { get; set; }
+
+        /// <summary> FromObject and ToObject: Constructor to indicate that this member should be ignored completely. </summary>
+        public JsonIgnoreAttribute() { }
+
+        /// <summary> Options for FromObject only. </summary>
+        public enum Operation {
+            /// <summary> Use ignore to say the list is a set of members to ignore </summary>
+            Ignore,
+            /// <summary> Use include to say the list is a set of members only to include </summary>
+            Include
+        };
+
+        /// <summary> FromObject: Constructor to indicate which members to enumerate to JSON.  
+        /// ToObject: the setting is ignored and the member processed as normal
+        /// If Ignore, name list are the members which should be excluded. All others will be included
+        /// If Include, name list are only the members which will be included, all others will be excluded.
+        /// </summary>
+        public JsonIgnoreAttribute(Operation ignoreorinclude, params string[] names) { if (ignoreorinclude==Operation.Include) IncludeOnly = names; else Ignore = names; }
     }
 
     /// <summary>
     /// Name attribute. Attach to an member of a class to indicate an alternate name to use in the JSON structure from its c# name.
     /// Applicable to FromObject and ToObject.  ToObject supports multiple names (any name in JSON will match this entry), FromObject only one.
     /// </summary>
-    public sealed class JsonNameAttribute : Attribute 
+    public sealed class JsonNameAttribute : Attribute
     {
         /// <summary> List of names for this attribute </summary>
         public string[] Names { get; set; }
@@ -61,7 +85,7 @@ namespace QuickJSON
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r.IsInError ? null : r;
         }
@@ -77,12 +101,30 @@ namespace QuickJSON
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r;
         }
 
-        private static JToken FromObjectInt(Object o, bool ignoreunserialisable, Type[] ignored, Stack<Object> objectlist, int lvl, int maxrecursiondepth, System.Reflection.BindingFlags membersearchflags )
+        /// <summary>
+        /// Internal Object converstion
+        /// </summary>
+        /// <param name="o">object</param>
+        /// <param name="ignoreunserialisable"></param>
+        /// <param name="ignoredtypes"></param>
+        /// <param name="objectlist">Stack of objects already processed</param>
+        /// <param name="lvl">recursion level</param>
+        /// <param name="maxrecursiondepth">max recurson level</param>
+        /// <param name="membersearchflags">which members of a class to include</param>
+        /// <param name="memberignore">which members of a class to ignore, null for none</param>
+        /// <param name="memberinclude">which members of a class to include only, null for all, else must be in list</param>
+        /// <returns></returns>
+        private static JToken FromObjectInt(Object o, bool ignoreunserialisable, 
+                        Type[] ignoredtypes, Stack<Object> objectlist, 
+                        int lvl, int maxrecursiondepth, 
+                        System.Reflection.BindingFlags membersearchflags,
+                        HashSet<string> memberignore, HashSet<string> memberinclude
+                        )
         {
             //System.Diagnostics.Debug.WriteLine(lvl + "From Object on " + o.GetType().Name);
 
@@ -110,7 +152,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IDictionary");
                     }
 
-                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);
+                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -150,7 +192,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IEnumerable");
                     }
 
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);
+                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null);
 
                     if (inner.IsInError)      // used as an error type
                     {
@@ -176,35 +218,66 @@ namespace QuickJSON
 
                 foreach (var mi in allmembers)
                 {
+                    string attrname = mi.Name;
+
+                    // check if these are set to see if the attr name has been removed by either include list or ignore list
+
+                    if ( (memberinclude != null && !memberinclude.Contains(attrname)) ||
+                            ( memberignore != null && memberignore.Contains(attrname)))
+                    {
+                        continue;
+                    }
+
+                    // pick up type 
+
                     Type innertype = null;
 
                     if (mi.MemberType == System.Reflection.MemberTypes.Property)
+                    {
                         innertype = ((System.Reflection.PropertyInfo)mi).PropertyType;
+                    }
                     else if (mi.MemberType == System.Reflection.MemberTypes.Field)
                     {
                         var fi = (System.Reflection.FieldInfo)mi;
                         innertype = fi.FieldType;
                     }
                     else
+                        continue;       // not a prop/field
+
+                    // is it ignored?
+
+                    if (ignoredtypes != null && Array.IndexOf(ignoredtypes, innertype) >= 0)
                         continue;
 
-                    if (ignored != null && Array.IndexOf(ignored, innertype) >= 0)
-                        continue;
+                    // pick up JSONIgnoreAttribute and see if its members are empty (ignore all) or have an include/ignore list
+
+                    HashSet<string> ignorelist = null;
+                    HashSet<string> includeonly = null;
 
                     var ca = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                    if (ca.Length > 0)                                              // ignore any ones with JsonIgnore on it.
-                        continue;
+                    if (ca.Length > 0)                                             
+                    {
+                        JsonIgnoreAttribute jia = ca[0] as JsonIgnoreAttribute;
+                        if (jia.Ignore != null)
+                            ignorelist = jia.Ignore.ToHashSet();
+                        else if (jia.IncludeOnly != null)
+                            includeonly = jia.IncludeOnly.ToHashSet();
+                        else
+                            continue;   // ignore all with no lists
+                    }
 
-                    string attrname = mi.Name;
+                    // see if rename is active
 
                     var rename = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                    if (rename.Length == 1)                                         // any ones with a rename, use that name     
+                    if (rename.Length == 1)                                         
                     {
                         dynamic attr = rename[0];                                   // dynamic since compiler does not know rename type
                         attrname = attr.Names[0];                                   // only first entry is used for FromObject
                     }
 
                     //System.Diagnostics.Debug.WriteLine("Member " + mi.Name + " " + mi.MemberType + " attrname " + attrname);
+
+                    // get the value
 
                     Object innervalue = null;
                     if (mi.MemberType == System.Reflection.MemberTypes.Property)
@@ -227,7 +300,7 @@ namespace QuickJSON
                             return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
 
-                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);     // may return End Object if not serializable
+                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, ignorelist, includeonly);     // may return End Object if not serializable
 
                         if (token.IsInError)
                         {

@@ -170,9 +170,9 @@ namespace QuickJSON
                     else
                         return new ToObjectError($"JSONToObject: Not array {converttype.Name}");        // catch all ending
                 }
-                catch
+                catch (Exception ex)
                 {
-                    return new ToObjectError($"JSONToObject: Create Error {converttype.Name}");       
+                    return new ToObjectError($"JSONToObject: Create Error {converttype.Name} {ex.Message}");       
                 }
 
             }
@@ -299,7 +299,9 @@ namespace QuickJSON
                         {
                             var ca = checkcustomattr ? mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false) : null;
 
-                            if (ca == null || ca.Length == 0)                                              // ignore any ones with JsonIgnore on it.
+                            bool includeit = ca == null || ca.Length == 0 || (((JsonIgnoreAttribute)ca[0]).Ignore != null) || (((JsonIgnoreAttribute)ca[0]).IncludeOnly != null);
+
+                            if (includeit)                                              // ignore any ones with JsonIgnore on it which is empty of parameters
                             {
                                 Type otype = mi.FieldPropertyType();
 
@@ -335,6 +337,10 @@ namespace QuickJSON
                                         }
                                     }
                                 }
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"ToObject ignore {mi.Name}");
                             }
                         }
                         else

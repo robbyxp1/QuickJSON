@@ -48,16 +48,33 @@ namespace QuickJSON
         }
 
         /// <summary> Convert to string </summary>
+        /// <param name="prepad">Pad before token is outputted</param>
+        /// <param name="postpad">Pad after token is outputted</param>
+        /// <param name="oapad">Pad before objects or arrays are outputted</param>
+        /// <param name="stringliterals">true to output strings or keys without escaping or quoting</param>
+        /// <param name="linelength">introduce new line between entries when exceeded this length. If postpad = \r\n don't use</param>
+        /// <returns>JSON string representation</returns>
+        public string ToString(string prepad, string postpad, string oapad, bool stringliterals, int linelength = int.MaxValue)
+        {
+            var sb = new System.Text.StringBuilder();
+            int lastcr = 0;
+            ToStringBuilder(sb, this, prepad, postpad, oapad, stringliterals, ref lastcr, linelength);
+            return sb.ToString();
+        }
+
+        /// <summary> Convert to string </summary>
         /// <param name="token">Token to convert</param>
         /// <param name="prepad">Pad before token is outputted</param>
         /// <param name="postpad">Pad after token is outputted</param>
         /// <param name="oapad">Pad before objects or arrays are outputted</param>
         /// <param name="stringliterals">true to output strings or keys without escaping or quoting</param>
+        /// <param name="linelength">introduce new line between entries when exceeded this length. If postpad = \r\n don't use</param>
         /// <returns>JSON string representation</returns>
-        public static string ToString(JToken token, string prepad, string postpad, string oapad, bool stringliterals)
+        public static string ToString(JToken token, string prepad, string postpad, string oapad, bool stringliterals, int linelength = int.MaxValue)
         {
             var sb = new System.Text.StringBuilder();
-            ToStringBuilder(sb, token, prepad, postpad, oapad, stringliterals);
+            int lastcr = 0;
+            ToStringBuilder(sb, token, prepad, postpad, oapad, stringliterals, ref lastcr, linelength);
             return sb.ToString();
         }
     }

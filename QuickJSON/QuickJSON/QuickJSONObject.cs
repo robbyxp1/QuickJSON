@@ -94,6 +94,15 @@ namespace QuickJSON
         /// <summary> Does the JObject contain property name</summary>
         public bool Contains(string name) { return Objects.ContainsKey(name); }
 
+        /// <summary> Does the JObject contain all the listed properties</summary>
+        public bool ContainsThese(params string[] name) { return Objects.Where( kvp => name.Contains(kvp.Key)).Count() == name.Length; }
+
+        /// <summary> Return other properties not in this list</summary>
+        public IEnumerable<string> UnknownProperties(params string[] name) { return Objects.Where(kvp => !name.Contains(kvp.Key)).Select(kvp=>kvp.Key); }
+
+        /// <summary> Return other properties not in this pair of lists</summary>
+        public IEnumerable<string> UnknownProperties(string[] name, params string[] name2) { return Objects.Where(kvp => !(name.Contains(kvp.Key) || name2.Contains(kvp.Key))).Select(kvp => kvp.Key); }
+
         /// <summary> Get a JToken by this property name</summary>
         /// <param name="name">Name of property</param>
         /// <param name="token">Where to store the found JToken</param>
