@@ -285,6 +285,11 @@ namespace QuickJSON.Utils
         }
 
 
+        /// <summary>
+        /// Parse integer from string invariant culture, return null if not parsed
+        /// </summary>
+        /// <param name="s">string</param>
+        /// <returns>null of integer</returns>
         static public int? InvariantParseIntNull(this string s)     // s can be null
         {
             int i;

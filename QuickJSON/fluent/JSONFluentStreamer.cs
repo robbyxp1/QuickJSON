@@ -37,6 +37,10 @@ namespace QuickJSON
             this.writeblock = writeblock;
         }
 
+        /// <summary>
+        /// Internal prefix function
+        /// </summary>
+        /// <param name="named">is named parameter</param>
         protected override void Prefix(bool named)
         {
             if ( Length >= writeblock )
@@ -50,8 +54,12 @@ namespace QuickJSON
             base.Prefix(named);
         }
 
+        /// <summary>
+        /// Close() and then write all of the data to the stream
+        /// </summary>
         public void Dispose()
         {
+            Close();
             if ( Length >= 0 )
             {
                 var bytes = enc.GetBytes(CurrentText);

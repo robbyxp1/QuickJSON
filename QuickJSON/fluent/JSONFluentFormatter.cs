@@ -328,6 +328,10 @@ namespace QuickJSON
         private bool precomma;          // starts false, every value sets it true.
         private bool lf;                // want a lf next
 
+        /// <summary>
+        /// Internal prefix function
+        /// </summary>
+        /// <param name="named">is named parameter </param>
         protected virtual void Prefix(bool named)
         {
             if (named)

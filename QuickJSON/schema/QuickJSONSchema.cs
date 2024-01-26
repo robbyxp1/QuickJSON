@@ -48,7 +48,6 @@ namespace QuickJSON
         /// <summary>
         /// Parse a schema, with optional input
         /// </summary>
-        /// <param name="jschema">schema</param>
         /// <param name="jinput">input</param>
         /// <returns>Empty string no errors, else a list of \n separated errors</returns>
         public string Validate(JToken jinput = null)
@@ -167,6 +166,7 @@ namespace QuickJSON
         /// <summary>
         /// Parser
         /// </summary>
+        /// <param name="jpath">Path of node</param>
         /// <param name="curschema">schema at this point</param>
         /// <param name="input">input, may be null, at this point</param>
         /// <param name="additionalpropertiesfeed">any additional properties inherited from above</param>
