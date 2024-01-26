@@ -55,7 +55,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions.cs" />
+    <Compile Include="JSONPaths.cs" />
+    <Compile Include="JSONFluent.cs" />
+    <Compile Include="JSONToObject.cs" />
     <Compile Include="JSONSchema.cs" />
+    <Compile Include="JSONFromObject.cs" />
     <Compile Include="JSONTextreader.cs" />
     <Compile Include="JSONTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -68,7 +72,21 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="Resources\approachsettlement-v1.0.json" />
+    <None Include="Resources\ApproachSettlement_1_t09-00.eddnlog" />
     <None Include="Resources\blackmarket-v1.0.json" />
+    <None Include="Resources\CarrierJump_1_t09-00.eddnlog" />
+    <None Include="Resources\Commodity_3_t11-00.eddnlog" />
+    <None Include="Resources\Docked_1_t09-00.eddnlog" />
+    <None Include="Resources\FSDJump_1_t10-00.eddnlog" />
+    <None Include="Resources\FSSAllBodiesFound_1_t10-00.eddnlog" />
+    <None Include="Resources\FSSDiscoveryScan_1_t10-00.eddnlog" />
+    <None Include="Resources\FSSSignalDiscovered_1_t10-00.eddnlog" />
+    <None Include="Resources\NavRoute_1_t10-00.eddnlog" />
+    <None Include="Resources\Outfitting_2_t10-00.eddnlog" />
+    <None Include="Resources\SAASignalsFound_1_t10-00.eddnlog" />
+    <None Include="Resources\Scan_1_t11-00.eddnlog" />
+    <None Include="Resources\Shipyard_2_t09-00.eddnlog" />
+    <None Include="Resources\Simpleref.json" />
     <None Include="Resources\codexentry-v1.0.json" />
     <None Include="Resources\commodity-v3.0.json" />
     <None Include="Resources\fcmaterials_capi-v1.0.json" />

@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2020 Robbyxp1 @ github.com
+ * Copyright © 2020-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -15,7 +15,6 @@
 using QuickJSON.Utils;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 
 namespace QuickJSON
 {
@@ -83,7 +82,7 @@ namespace QuickJSON
             return res;
         }
 
-        private static IEnumerable<JToken> ParseTokenInt(IStringParserQuick parser, JToken.ParseOptions flags = JToken.ParseOptions.None, int maxstringlen = 16384)
+        private static IEnumerable<JToken> ParseTokenInt(IStringParserQuick parser, JToken.ParseOptions flags, int maxstringlen)
         {
             char[] textbuffer = new char[maxstringlen];
             JToken[] stack = new JToken[1024];
@@ -101,7 +100,10 @@ namespace QuickJSON
                 {
                     throw new TokenException(GenErrorString(parser, "No Obj/Array"));
                 }
-                else if (o.TokenType == JToken.TType.Array)
+
+                o.Level = sptr;
+                
+                if (o.TokenType == JToken.TType.Array)
                 {
                     stack[++sptr] = o;                      // push this one onto stack
                     curarray = o as JArray;                 // this is now the current array
@@ -138,7 +140,7 @@ namespace QuickJSON
                             }
                             else
                             {
-                                yield return new JToken(JToken.TType.EndObject);
+                                yield return new JToken(JToken.TType.EndObject, level:sptr-1);
 
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
@@ -192,6 +194,7 @@ namespace QuickJSON
                                 else
                                 {
                                     o.Name = name;
+                                    o.Level = sptr;
 
                                     yield return o;
 
@@ -203,7 +206,7 @@ namespace QuickJSON
                                         }
 
                                         stack[++sptr] = o;          // push this one onto stack
-                                        curarray = o as JArray;                 // this is now the current object
+                                        curarray = o as JArray;     // this is now the current object
                                         curobject = null;
                                         comma = false;
                                         break;
@@ -250,7 +253,7 @@ namespace QuickJSON
                             }
                             else
                             {
-                                yield return new JToken(JToken.TType.EndArray);
+                                yield return new JToken(JToken.TType.EndArray, level:sptr-1);
 
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
@@ -276,6 +279,8 @@ namespace QuickJSON
                         }
                         else
                         {
+                            o.Level = sptr;
+
                             yield return o;
 
                             if (o.TokenType == JToken.TType.Array) // if array, we need to change to this as controlling object on top of stack

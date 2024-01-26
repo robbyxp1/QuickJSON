@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2020-2023 Robbyxp1 @ github.com
+ * Copyright © 2020-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -60,6 +60,16 @@ namespace QuickJSON
         public string[] Names { get; set; }
         /// <summary> Constructor with name list </summary>
         public JsonNameAttribute(params string[] names) { Names = names; }
+
+    }
+    /// <summary>
+    /// Attach to a member to indicate if the value of it is null, don't add it to JSON.
+    /// FromObject only
+    /// </summary>
+    public sealed class JsonIgnoreIfNullAttribute : Attribute
+    {
+        /// <summary> Constructor </summary>
+        public JsonIgnoreIfNullAttribute() {}
     }
 
     public partial class JToken
@@ -80,12 +90,14 @@ namespace QuickJSON
         /// <param name="ignored">List of ignored types not to serialise, may be null</param>
         /// <param name="maxrecursiondepth">Maximum depth to recurse through the objects heirarchy</param>
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
+        /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <returns>Null if can't convert (error detected) or JToken tree</returns>
         public static JToken FromObject(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
-            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static)
+            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
+            bool ignoreobjectpropertyifnull = false)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r.IsInError ? null : r;
         }
@@ -96,12 +108,14 @@ namespace QuickJSON
         /// <param name="ignored">List of ignored types not to serialise, may be null</param>
         /// <param name="maxrecursiondepth">Maximum depth to recurse through the objects heirarchy</param>
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
+        /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <returns>JToken error type if can't convert (check with IsInError, value has error reason) or JToken tree</returns>
         public static JToken FromObjectWithError(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
-            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static)
+            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
+            bool ignoreobjectpropertyifnull = false)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r;
         }
@@ -118,12 +132,14 @@ namespace QuickJSON
         /// <param name="membersearchflags">which members of a class to include</param>
         /// <param name="memberignore">which members of a class to ignore, null for none</param>
         /// <param name="memberinclude">which members of a class to include only, null for all, else must be in list</param>
+        /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <returns></returns>
         private static JToken FromObjectInt(Object o, bool ignoreunserialisable, 
                         Type[] ignoredtypes, Stack<Object> objectlist, 
                         int lvl, int maxrecursiondepth, 
                         System.Reflection.BindingFlags membersearchflags,
-                        HashSet<string> memberignore, HashSet<string> memberinclude
+                        HashSet<string> memberignore, HashSet<string> memberinclude,
+                        bool ignoreobjectpropertyifnull
                         )
         {
             //System.Diagnostics.Debug.WriteLine(lvl + "From Object on " + o.GetType().Name);
@@ -152,7 +168,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IDictionary");
                     }
 
-                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null);
+                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -192,7 +208,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IEnumerable");
                     }
 
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null);
+                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull);
 
                     if (inner.IsInError)      // used as an error type
                     {
@@ -300,7 +316,7 @@ namespace QuickJSON
                             return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
 
-                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, ignorelist, includeonly);     // may return End Object if not serializable
+                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, ignorelist, includeonly, ignoreobjectpropertyifnull);     // may return End Object if not serializable
 
                         if (token.IsInError)
                         {
@@ -315,7 +331,11 @@ namespace QuickJSON
                     }
                     else
                     {
-                        outobj[attrname] = JToken.Null();        // its null so its a JNull
+                        // see if null exclude is active
+                        bool ignoreifnull = ignoreobjectpropertyifnull || mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false).Length == 1;
+
+                        if ( ignoreifnull == false)         
+                            outobj[attrname] = JToken.Null();        // its null so its a JNull
                     }
                 }
 

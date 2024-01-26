@@ -44,8 +44,7 @@
                     "minLength"     : 1
                 },                
                 "marketId": {
-                    "type"          : "integer",
-                    "renamed"       : "MarketID"
+                    "type"          : "integer"
                 },
                 "timestamp": {
                     "type"          : "string",
@@ -53,7 +52,6 @@
                 },
                 "name": {
                     "type"          : "string",
-                    "renamed"       : "Type",
                     "minLength"     : 1,
                     "description"   : "Commodity name as returned by the MarketSell entry in the Journal"
                 },
@@ -63,7 +61,6 @@
                 },
                 "prohibited": {
                     "type"          : "boolean",
-                    "renamed"       : "IllegalGoods",
                     "description"   : "Whether the commodity is prohibited at this station"
                 }
             }

@@ -48,12 +48,10 @@
                 },
                 "stationName": {
                     "type"      : "string",
-                    "renamed"   : "StarSystem",
                     "minLength" : 1
                 },                
                 "marketId": {
-                    "type"      : "integer",
-                    "renamed"   : "MarketID"
+                    "type"      : "integer"
                 },
                 "horizons": {
                     "type"      : "boolean",
@@ -77,13 +75,12 @@
                         "properties"            : {
                             "name": {
                                 "type"          : "string",
-                                "renamed"       : "Name",
                                 "minLength"     : 1,
                                 "description"   : "Symbolic name as returned by the Companion API"
                             },
                             "meanPrice": {
-                                "type"          : "integer",
-                                "renamed"       : "MeanPrice"
+                                "type": "integer",
+                                "minimum" :  0
                             },
                             "buyPrice": {
                                 "type"          : "integer",
@@ -91,25 +88,21 @@
                                 "description"   : "Price to buy from the market"
                             },
                             "stock": {
-                                "type"          : "integer",
-                                "renamed"       : "Stock"
+                                "type"          : "integer"
                             },
                             "stockBracket": {
-                                "$ref"          : "#/definitions/levelType",
-                                "renamed"       : "StockBracket"
+                                "$ref"          : "#/definitions/levelType"
                             },
                             "sellPrice": {
-                                "type"          : "integer",
-                                "renamed"       : "SellPrice",
+                              "type": "integer",
+                              "renamed" :  "SellPrice",
                                 "description"   : "Price to sell to the market"
                             },
                             "demand": {
-                                "type"          : "integer",
-                                "renamed"       : "Demand"
+                                "type"          : "integer"
                             },
                             "demandBracket": {
-                                "$ref"          : "#/definitions/levelType",
-                                "renamed"       : "DemandBracket"
+                                "$ref"          : "#/definitions/levelType"
                             },
                             "statusFlags": {
                                 "type"          : "array",

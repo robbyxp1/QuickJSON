@@ -63,6 +63,16 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] ApproachSettlement_1_t09_00 {
+            get {
+                object obj = ResourceManager.GetObject("ApproachSettlement_1_t09_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] approachsettlement_v1_0 {
             get {
                 object obj = ResourceManager.GetObject("approachsettlement_v1_0", resourceCulture);
@@ -83,6 +93,16 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] CarrierJump_1_t09_00 {
+            get {
+                object obj = ResourceManager.GetObject("CarrierJump_1_t09_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] codexentry_v1_0 {
             get {
                 object obj = ResourceManager.GetObject("codexentry_v1_0", resourceCulture);
@@ -93,9 +113,29 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] Commodity_3_t11_00 {
+            get {
+                object obj = ResourceManager.GetObject("Commodity_3_t11_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] commodity_v3_0 {
             get {
                 object obj = ResourceManager.GetObject("commodity_v3_0", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Docked_1_t09_00 {
+            get {
+                object obj = ResourceManager.GetObject("Docked_1_t09_00", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -123,6 +163,26 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] FSDJump_1_t10_00 {
+            get {
+                object obj = ResourceManager.GetObject("FSDJump_1_t10_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] FSSAllBodiesFound_1_t10_00 {
+            get {
+                object obj = ResourceManager.GetObject("FSSAllBodiesFound_1_t10_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] fssallbodiesfound_v1_0 {
             get {
                 object obj = ResourceManager.GetObject("fssallbodiesfound_v1_0", resourceCulture);
@@ -143,9 +203,29 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] FSSDiscoveryScan_1_t10_00 {
+            get {
+                object obj = ResourceManager.GetObject("FSSDiscoveryScan_1_t10_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] fssdiscoveryscan_v1_0 {
             get {
                 object obj = ResourceManager.GetObject("fssdiscoveryscan_v1_0", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] FSSSignalDiscovered_1_t10_00 {
+            get {
+                object obj = ResourceManager.GetObject("FSSSignalDiscovered_1_t10_00", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -183,9 +263,29 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] NavRoute_1_t10_00 {
+            get {
+                object obj = ResourceManager.GetObject("NavRoute_1_t10_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] navroute_v1_0 {
             get {
                 object obj = ResourceManager.GetObject("navroute_v1_0", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Outfitting_2_t10_00 {
+            get {
+                object obj = ResourceManager.GetObject("Outfitting_2_t10_00", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -203,6 +303,26 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] SAASignalsFound_1_t10_00 {
+            get {
+                object obj = ResourceManager.GetObject("SAASignalsFound_1_t10_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Scan_1_t11_00 {
+            get {
+                object obj = ResourceManager.GetObject("Scan_1_t11_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] scanbarycentre_v1_0 {
             get {
                 object obj = ResourceManager.GetObject("scanbarycentre_v1_0", resourceCulture);
@@ -213,9 +333,29 @@ namespace Tests.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] Shipyard_2_t09_00 {
+            get {
+                object obj = ResourceManager.GetObject("Shipyard_2_t09_00", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] shipyard_v2_0 {
             get {
                 object obj = ResourceManager.GetObject("shipyard_v2_0", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Simpleref {
+            get {
+                object obj = ResourceManager.GetObject("Simpleref", resourceCulture);
                 return ((byte[])(obj));
             }
         }

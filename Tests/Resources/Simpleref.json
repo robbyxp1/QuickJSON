@@ -1,0 +1,28 @@
+{
+    "$schema"               : "http://json-schema.org/draft-04/schema#",
+    "id"                    : "https://eddn.edcd.io/schemas/codexentry/1#",
+    "type"                  : "object",
+    "additionalProperties"  : false,
+    "properties": {
+        "message": {
+            "type"                  : "object",
+            "properties"            : {
+                "IsNewEntry": {
+                    "$ref"          : "#/definitions/disallowed",
+                    "description"   : "Contains personal data"
+                },
+                "NewTraitsDiscovered": {
+                    "$ref"          : "#/definitions/traits",
+                    "description"   : "Contains personal data"
+                }
+            },
+            "patternProperties": {
+                "_Localised$"       : { "$ref" : "#/definitions/disallowed" }
+            }
+        }
+    },
+  "definitions": {
+    "disallowed": { "not": { "type": [ "array", "boolean", "integer", "number", "null", "object", "string" ] } },
+    "traits": { "type" :  "integer" }
+  }
+}

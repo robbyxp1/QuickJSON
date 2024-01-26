@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2020 Robbyxp1 @ github.com
+ * Copyright © 2020-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -28,7 +28,7 @@ namespace QuickJSON
     /// JToken is the base type of all JSON Tokens.  JObject and JArray are derived from this
     /// Provides Parsers and Decoders for all JSON properties
     /// </summary>
-    [System.Diagnostics.DebuggerDisplay("{TokenType} {ToString()}")]
+    [System.Diagnostics.DebuggerDisplay("L{Level}:{Name}:{TokenType}= {ToString()}")]
     public partial class JToken : IEnumerable<JToken>, IEnumerable
     {
         /// <summary> Token Type</summary>
@@ -62,9 +62,11 @@ namespace QuickJSON
         /// <summary> The JToken type </summary>
         public TType TokenType { get; set; }
         /// <summary> Value of the token, if it has one </summary>
-        public Object Value { get; set; }               
+        public Object Value { get; set; }
         /// <summary> Name of token if its a property of an JSON Object</summary>
-        public string Name { get; set; }                        
+        public string Name { get; set; }
+        /// <summary> Heirachy level, 0 onwards. Set in TokenReader and Parse.  Otherwise ignored. </summary>
+        public int Level { get; set; }
 
         /// <summary> Does the object have a Value. True for bool/string/number</summary>
         public bool HasValue { get { return Value != null;  } }
@@ -114,13 +116,14 @@ namespace QuickJSON
             Value = other.Value;
             Name = other.Name;
         }
-        
+
         /// <summary> Create a token </summary>
         /// <param name="tokentype">Token type to make</param>
         /// <param name="value">Optional, value of token</param>
-        public JToken(TType tokentype, Object value = null)
+        /// <param name="level">Set the level of the token in the JSON heirarchy</param>
+        public JToken(TType tokentype, Object value = null ,int level = 0)
         {
-            TokenType = tokentype; Value = value;
+            TokenType = tokentype; Value = value; Level = level;
         }
 
         /// <summary> Implicit conversion of a string to a JSON token of the type String </summary>
@@ -491,8 +494,41 @@ namespace QuickJSON
                 return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
         }
 
+        /// <summary> Return a copy of this JToken </summary>
+        public JToken Clone()   // make a copy of the token
+        {
+            switch (TokenType)
+            {
+                case TType.Array:
+                    {
+                        JArray copy = new JArray();
+                        foreach (JToken t in this)
+                        {
+                            copy.Add(t.Clone());
+                        }
+
+                        return copy;
+                    }
+                case TType.Object:
+                    {
+                        JObject copy = new JObject();
+                        foreach (var kvp in (JObject)this)
+                        {
+                            copy[kvp.Key] = kvp.Value.Clone();
+                        }
+                        return copy;
+                    }
+                default:
+                    return new JToken(this);
+            }
+        }
+
+        #endregion
+
+        #region Equality
+
         /// <summary> Is this token equal to another tokens value. Only for object types of string, int, uint, long, ulong, bool </summary>
-        public bool ValueEquals(Object value)               // NOTE not doing float/double due to approximations. Don't override Equals.
+        public bool ValueEquals(Object value)               
         {
             if (value is string)
                 return ((string)this) != null && ((string)this).Equals((string)value);
@@ -547,33 +583,91 @@ namespace QuickJSON
             return false;
         }
 
-        /// <summary> Return a copy of this JToken </summary>
-        public JToken Clone()   // make a copy of the token
-        {
-            switch (TokenType)
-            {
-                case TType.Array:
-                    {
-                        JArray copy = new JArray();
-                        foreach (JToken t in this)
-                        {
-                            copy.Add(t.Clone());
-                        }
+        #endregion
 
-                        return copy;
-                    }
-                case TType.Object:
-                    {
-                        JObject copy = new JObject();
-                        foreach (var kvp in (JObject)this)
-                        {
-                            copy[kvp.Key] = kvp.Value.Clone();
-                        }
-                        return copy;
-                    }
-                default:
-                    return new JToken(this);
+        #region Paths
+
+        /// <summary>
+        /// Get the token at the end of the path using schema format
+        /// objectname/objectname only.  Do not include #/ as we do not have an absolute path.
+        /// </summary>
+        /// <param name="path">Path to the token</param>
+        /// <returns></returns>
+        public JToken GetTokenSchemaPath(string path)
+        {
+            JToken token = this;
+
+            while ( path.Length>0)
+            {
+                if (!token.IsObject)
+                    return null;
+
+                int indexofslash = path.IndexOf("/");
+                string name = indexofslash == -1 ? path : path.Substring(0, indexofslash);
+                path = indexofslash == -1 ? "" : path.Substring(indexofslash + 1);
+
+                if (token.Object().Contains(name))
+                    token = token.Object()[name];
+                else
+                    return null;
             }
+
+            return token;
+        }
+
+        /// <summary>
+        /// Get the token at the end of the path using JSONPath format.  
+        /// . [] format only. Do not include $ as we do not have an absolute path.
+        /// https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html
+        /// </summary>
+        /// <param name="path">Path to the token</param>
+        /// <returns></returns>
+        public JToken GetToken(string path)
+        {
+            JToken token = this;
+
+            while (path.Length > 0)
+            {
+                if (token.IsArray)
+                {
+                    if (path[0] == '[')
+                    {
+                        int indexofbracket = path.IndexOf("]");
+                        if (indexofbracket == -1)
+                            return null;
+                        int? index = path.Substring(1, indexofbracket - 1).InvariantParseIntNull();
+                        if (index == null)
+                            return null;
+                        if (index >= token.Count || index < 0)
+                            return null;
+                        token = token[index];
+                        path = path.Substring(indexofbracket + 1);
+                    }
+                    else
+                        return null;
+                }
+                else if (token.IsObject)
+                {
+                    if (path[0] == '.')
+                    {
+                        path = path.Substring(1);
+                        int indexofdot = path.IndexOfAny(new char[] { '[', '.' });
+                        string name = indexofdot != -1 ? path.Substring(0, indexofdot) : path;
+                        path = indexofdot != -1 ? path.Substring(indexofdot) : "";
+
+                        if (token.Object().Contains(name))
+                            token = token[name];
+                        else
+                            return null;
+                    }
+                    else
+                        return null;
+                }
+                else
+                    return null;
+            }
+
+            return token;
         }
 
         #endregion
@@ -641,7 +735,7 @@ namespace QuickJSON
         /// </exception>
         public virtual void Clear() { throw new NotImplementedException(); }    // clear all children
 
-#endregion
+        #endregion
 
     }
 }

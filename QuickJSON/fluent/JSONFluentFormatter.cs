@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright 2019-2022 Robbyxp1 @ github.com
+ * Copyright 2019-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -15,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using QuickJSON.Utils;
 
 namespace QuickJSON
@@ -41,7 +42,7 @@ namespace QuickJSON
         /// <summary> Constructor </summary>
         public JSONFormatter()
         {
-            json = "";
+            json = new StringBuilder(10000);
             stack = new List<StackEntry>();
             precomma = false;
         }
@@ -53,9 +54,15 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\":";
-            json += "\"" + data + "\"";
-            System.Diagnostics.Debug.WriteLine($"String: `{json}`");
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":");
+            }
+            json.Append('"');
+            json.Append(data);
+            json.Append('"');
+            //System.Diagnostics.Debug.WriteLine($"String: `{json}`");
             return this;
         }
 
@@ -67,6 +74,29 @@ namespace QuickJSON
             return V(null, data);
         }
 
+        /// <summary> Add a property called name with a float value</summary>
+        /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name
+        /// </exception>
+        public JSONFormatter V(string name, float value)
+        {
+            Prefix(name != null);
+            if (name != null)
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":");
+            }
+            json.Append(value.ToString("R"));
+            return this;
+        }
+
+        /// <summary> Add an array element with a float value</summary>
+        /// <exception cref="FormatterException">Thrown if adding to an object because of no property name or if first element added
+        /// </exception>
+        public JSONFormatter V(float value)
+        {
+            return V(null, value);
+        }
         /// <summary> Add a property called name with a double value</summary>
         /// <exception cref="FormatterException">Thrown if adding to an array or start with a property name
         /// </exception>
@@ -74,8 +104,12 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\":";
-            json += value.ToString("R");
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":");
+            }
+            json.Append(value.ToString("R"));
             return this;
         }
 
@@ -94,9 +128,13 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\":";
-            json += value.ToStringInvariant();
-            System.Diagnostics.Debug.WriteLine($"Int: `{json}`");
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":");
+            }
+            json.Append(value.ToStringInvariant());
+            //System.Diagnostics.Debug.WriteLine($"Int: `{json}`");
             return this;
         }
 
@@ -115,8 +153,12 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\":";
-            json += value.ToStringInvariant();
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":");
+            }
+            json.Append(value.ToStringInvariant());
             return this;
         }
 
@@ -135,8 +177,12 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\":";
-            json += value ? "true" : "false";
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":");
+            }
+            json.Append(value ? "true" : "false");
             return this;
         }
 
@@ -155,8 +201,14 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\":";
-            json += "\"" + value.ToString("yyyy-MM-ddTHH:mm:ssZ") + "\"";
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":");
+            }
+            json.Append('"');
+            json.Append(value.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+            json.Append('"'); 
             return this;
         }
 
@@ -175,13 +227,17 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\": [ ";
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":[");
+            }
             else
-                json += "[ ";
+                json.Append("[");
 
             stack.Add(new StackEntry(StackType.Array, precomma));
             precomma = false;
-            System.Diagnostics.Debug.WriteLine($"Array: `{json}`");
+            //System.Diagnostics.Debug.WriteLine($"Array: `{json}`");
             return this;
         }
 
@@ -192,12 +248,17 @@ namespace QuickJSON
         {
             Prefix(name != null);
             if (name != null)
-                json += "\"" + name + "\":{ ";
+            {
+                json.Append('"');
+                json.Append(name);
+                json.Append("\":{");
+            }
             else
-                json += "{ ";
+                json.Append("{");
+
             stack.Add(new StackEntry(StackType.Object, precomma));
             precomma = false;
-            System.Diagnostics.Debug.WriteLine($"Object: `{json}`");
+            //System.Diagnostics.Debug.WriteLine($"Object: `{json}`");
             return this;
         }
 
@@ -208,16 +269,22 @@ namespace QuickJSON
             {
                 StackEntry e = stack.Last();
 
+                if (lf)
+                {
+                    json.Append(Environment.NewLine);
+                    lf = false;
+                }
+
                 if (e.stacktype == StackType.Array)
-                    json += " ]";
+                    json.Append(']');
                 else
-                    json += " }";
+                    json.Append('}');
 
                 precomma = e.precomma;
                 stack.RemoveAt(stack.Count - 1);
             }
 
-            System.Diagnostics.Debug.WriteLine($"Close: `{json}`");
+            //System.Diagnostics.Debug.WriteLine($"Close: `{json}`");
 
             return this;
         }
@@ -225,7 +292,7 @@ namespace QuickJSON
         /// <summary> Format the JSON output with a LF at this point </summary>
         public JSONFormatter LF()
         {
-            json += Environment.NewLine;
+            lf = true;
             return this;
         }
 
@@ -233,11 +300,19 @@ namespace QuickJSON
         public string Get()
         {
             Close(int.MaxValue);
-            return json.Trim();
+            return CurrentText;
+        }
+
+        /// <summary> Clear the buffer</summary>
+        public void Clear()
+        {
+            json.Clear();
         }
 
         /// <summary> For debugging purposes, return current text state. Use Get() to properly close and get the text </summary>
-        public string CurrentText { get { return json; } }
+        public string CurrentText { get { return json.ToString(); } }
+        /// <summary> How big is the JSON string</summary>
+        public int Length { get { return json.Length; } }
 
         private enum StackType { Array, Object };
         private class StackEntry
@@ -248,12 +323,12 @@ namespace QuickJSON
             { precomma = b; stacktype = a; }
         }
 
-        private string json;
-
+        private StringBuilder json;
         private List<StackEntry> stack;
-        private bool precomma;          // starts false, ever value sets it true.
+        private bool precomma;          // starts false, every value sets it true.
+        private bool lf;                // want a lf next
 
-        private void Prefix(bool named)
+        protected virtual void Prefix(bool named)
         {
             if (named)
             {
@@ -271,7 +346,13 @@ namespace QuickJSON
             }
 
             if (precomma)
-                json += ", ";
+                json.Append(',');
+
+            if (lf)
+            {
+                json.Append(Environment.NewLine);
+                lf = false;
+            }
 
             precomma = true;
         }

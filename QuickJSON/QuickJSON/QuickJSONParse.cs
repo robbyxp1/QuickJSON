@@ -1,6 +1,5 @@
-﻿
-/*
- * Copyright © 2020 Robbyxp1 @ github.com
+﻿/*
+ * Copyright © 2020-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -173,7 +172,10 @@ namespace QuickJSON
                 {
                     return ParseError(parser, "No Obj/Array", flags, out error);
                 }
-                else if (o.TokenType == TType.Array)
+
+                o.Level = sptr;
+
+                if (o.TokenType == TType.Array)
                 {
                     stack[++sptr] = o;                      // push this one onto stack
                     curarray = o as JArray;                 // this is now the current array
@@ -262,7 +264,9 @@ namespace QuickJSON
                                 }
                                 else
                                 {
+                                    o.Level = sptr;
                                     o.Name = name;                          // object gets the name, indicating its a property
+
                                     curobject[name] = o;                    // assign to dictionary
 
                                     if (o.TokenType == TType.Array)         // if array, we need to change to this as controlling object on top of stack
@@ -365,6 +369,8 @@ namespace QuickJSON
                         }
                         else
                         {
+                            o.Level = sptr;
+
                             curarray.Add(o);
 
                             if (o.TokenType == TType.Array) // if array, we need to change to this as controlling object on top of stack

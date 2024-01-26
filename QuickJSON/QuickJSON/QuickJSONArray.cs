@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2020 Robbyxp1 @ github.com
+ * Copyright © 2020-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -98,8 +98,11 @@ namespace QuickJSON
         /// <summary> Get number of JArray items </summary>
         public override int Count { get { return Elements.Count; } }
 
+        /// <summary> Index of JToken </summary>
+        public int IndexOf(JToken tk) { return Elements.IndexOf(tk); }
+
         /// <summary> Add a JToken to the end of the array </summary>
-        public void Add(JToken o) { Elements.Add(o); }
+        public void Add(JToken o) {Elements.Add(o); }
         /// <summary> Add a range of JTokens to the end of the array</summary>
         public void AddRange(IEnumerable<JToken> o) { Elements.AddRange(o); }
 

@@ -21,7 +21,9 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>1.4
+    <PackageReleaseNotes>1.5
+
+1.4
 JsonIgnoreAttribute added Ignore and IncludeOnly options so that you can pick members of a class or exclude specific ones
 1.3
 ToObject was missing a converstion to Object - added.

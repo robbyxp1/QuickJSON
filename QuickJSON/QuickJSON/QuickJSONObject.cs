@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2021 Robbyxp1 @ github.com
+ * Copyright © 2021-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -97,10 +97,10 @@ namespace QuickJSON
         /// <summary> Does the JObject contain all the listed properties</summary>
         public bool ContainsThese(params string[] name) { return Objects.Where( kvp => name.Contains(kvp.Key)).Count() == name.Length; }
 
-        /// <summary> Return other properties not in this list</summary>
+        /// <summary> Return other property names not in this list</summary>
         public IEnumerable<string> UnknownProperties(params string[] name) { return Objects.Where(kvp => !name.Contains(kvp.Key)).Select(kvp=>kvp.Key); }
 
-        /// <summary> Return other properties not in this pair of lists</summary>
+        /// <summary> Return other property names not in this pair of lists</summary>
         public IEnumerable<string> UnknownProperties(string[] name, params string[] name2) { return Objects.Where(kvp => !(name.Contains(kvp.Key) || name2.Contains(kvp.Key))).Select(kvp => kvp.Key); }
 
         /// <summary> Get a JToken by this property name</summary>
@@ -120,11 +120,44 @@ namespace QuickJSON
             return null;
         }
 
+        /// <summary>
+        /// Rename a field to newname. Returns true if done.  If newname already exists it is overwritten.
+        /// </summary>
+        /// <param name="fromname">Name to rename</param>
+        /// <param name="newname">New name</param>
+        /// <returns>true if fromname exists.</returns>
+        public bool Rename(string fromname, string newname)
+        {
+            if (Objects.ContainsKey(fromname))
+            {
+                Objects[newname] = Objects[fromname];
+                Objects.Remove(fromname);
+                return true;
+            }
+            else
+                return false;
+        }
+        
         /// <summary> Get number of properties </summary>
         public override int Count { get { return Objects.Count; } }
 
         /// <summary> Add a JToken with this property name.  Will overwrite any existing property</summary>
         public void Add(string key, JToken value) { this[key] = value; }
+
+        /// <summary>
+        /// Merge two objects together, with overwrite protection
+        /// </summary>
+        /// <param name="other">Other JObject to merge into this</param>
+        /// <param name="allowoverwrite">Allows overwriting of this object members with other</param>
+        public void Merge(JObject other, bool allowoverwrite = true)
+        {
+            foreach (var kvp in other)
+            {
+                if ( allowoverwrite || !this.Contains(kvp.Key))
+                    this[kvp.Key] = kvp.Value;
+            }
+        }
+
         /// <summary> Remove a JToken with this property name.  True if found, false if not</summary>
         public bool Remove(string key) { return Objects.Remove(key); }
         /// <summary> Remove JTokens with these property names.</summary>

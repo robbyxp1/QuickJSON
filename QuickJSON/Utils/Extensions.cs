@@ -1,5 +1,5 @@
 ﻿/*
-* Copyright © 2021 robbyxp1 @ github.com
+* Copyright © 2021-2024 robbyxp1 @ github.com
 *
 * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
 * file except in compliance with the License. You may obtain a copy of the License at
@@ -284,5 +284,16 @@ namespace QuickJSON.Utils
             return Math.Max(1, checksum);
         }
 
+
+        static public int? InvariantParseIntNull(this string s)     // s can be null
+        {
+            int i;
+            if (s != null && int.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out i))
+                return i;
+            else
+                return null;
+
+        }
     }
 }
+

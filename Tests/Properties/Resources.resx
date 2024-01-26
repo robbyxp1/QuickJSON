@@ -118,17 +118,29 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="ApproachSettlement_1_t09_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\ApproachSettlement_1_t09-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="approachsettlement_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\approachsettlement-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="blackmarket_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\blackmarket-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="CarrierJump_1_t09_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\CarrierJump_1_t09-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="codexentry_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\codexentry-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="Commodity_3_t11_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Commodity_3_t11-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="commodity_v3_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\commodity-v3.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Docked_1_t09_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Docked_1_t09-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="fcmaterials_capi_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\fcmaterials_capi-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
@@ -136,14 +148,26 @@
   <data name="fcmaterials_journal_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\fcmaterials_journal-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="FSDJump_1_t10_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\FSDJump_1_t10-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="FSSAllBodiesFound_1_t10_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\FSSAllBodiesFound_1_t10-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="fssallbodiesfound_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\fssallbodiesfound-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="fssbodysignals_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\fssbodysignals-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="FSSDiscoveryScan_1_t10_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\FSSDiscoveryScan_1_t10-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="fssdiscoveryscan_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\fssdiscoveryscan-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="FSSSignalDiscovered_1_t10_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\FSSSignalDiscovered_1_t10-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="fsssignaldiscovered_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\fsssignaldiscovered-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
@@ -154,16 +178,34 @@
   <data name="navbeaconscan_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\navbeaconscan-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="NavRoute_1_t10_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\NavRoute_1_t10-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="navroute_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\navroute-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Outfitting_2_t10_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Outfitting_2_t10-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="outfitting_v2_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\outfitting-v2.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="SAASignalsFound_1_t10_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\SAASignalsFound_1_t10-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="scanbarycentre_v1_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\scanbarycentre-v1.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
+  <data name="Scan_1_t11_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Scan_1_t11-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Shipyard_2_t09_00" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Shipyard_2_t09-00.eddnlog;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
   <data name="shipyard_v2_0" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\shipyard-v2.0.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="Simpleref" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\resources\simpleref.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
 </root>
