@@ -28,6 +28,236 @@ namespace JSONTests
         [Test]
         public void JSONSchemaTest1()
         {
+            {
+                string schema = @"{
+  ""type"": ""object"",
+  ""properties"": {
+    ""array"": { ""type"": ""array"", ""contains"": { ""type"":""string""}, ""minContains"":2, ""maxContains"":3 },
+    ""street_name"": { ""type"": ""string"" },
+    ""street_type"": { ""enum"": [""Street"", ""Avenue"", ""Boulevard""] }
+  },
+  ""additionalProperties"": false
+}
+";
+                string data = @"{
+    ""array"": [ 10,20,""fred"",""jim""],
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+
+                string err = JSONSchema.Validate(schema, data);
+                Check.That(err).IsEmpty();
+
+                data = @"{
+    ""array"": [ 10,20],
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+
+                err = JSONSchema.Validate(schema, data);
+                Check.That(err).Contains("contains failed minimum");
+
+                data = @"{
+    ""array"": [ 10,20, ""1"",""2"",""3"",""4""],
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+
+                err = JSONSchema.Validate(schema, data);
+                Check.That(err).Contains("contains failed maximum");
+
+            }
+
+
+            {
+                string schema = @"{
+  ""type"": ""object"",
+  ""properties"": {
+    ""number"": { ""not"" : { ""type"": [ ""array"", ""boolean"", ""integer"", ""number"", ""null"", ""object"", ""string"" ] }  },
+    ""street_name"": { ""type"": ""string"" },
+    ""street_type"": { ""enum"": [""Street"", ""Avenue"", ""Boulevard""] }
+  },
+  ""additionalProperties"": false
+}
+";
+                string data = @"{
+    ""number"": 20,
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+                string err = JSONSchema.Validate(schema, data);
+                Check.That(err).Contains("not condition at");
+
+                data = @"{
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+                err = JSONSchema.Validate(schema, data);
+                Check.That(err).IsEmpty();
+            }
+
+            {
+                string schema = @"{
+  ""type"": ""object"",
+  ""properties"": {
+    ""number"": { ""not"" : { ""type"": [ ""array"", ""boolean"", ""integer"", ""number"", ""null"", ""object""] }  },
+    ""street_name"": { ""type"": ""string"" },
+    ""street_type"": { ""enum"": [""Street"", ""Avenue"", ""Boulevard""] }
+  },
+  ""additionalProperties"": false
+}
+";
+                string data = @"{
+    ""number"": 20,
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+                string err = JSONSchema.Validate(schema, data);
+                Check.That(err).Contains("not condition at");
+
+                data = @"{
+    ""number"" : ""cossham"",
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+                err = JSONSchema.Validate(schema, data);        // string is okay
+                Check.That(err).IsEmpty();
+            }
+
+            {                                                           // check for 2-3 properties
+                string schema = @"
+{
+    ""type""                  : ""object"",
+    ""properties"": {
+        ""Items"": {
+            ""properties"": {
+                ""sales"": {
+                    ""oneOf"": [
+                        {
+                            ""type"": ""array"",
+                            ""$comment"": ""If there are no items then sales is an empty array"",
+                            ""minItems"": 0,
+                            ""maxItems"": 0
+                        },
+                        {
+                            ""type"": ""object"",
+                            ""additionalProperties"":false,
+        
+                            ""patternProperties"": {
+                                ""^[0-9]+$"": {
+                                    ""type""      : ""object"",
+                                    ""required""  : [ ""id"", ""name"", ""price"", ""stock"" ],
+                                    ""additionalProperties"": false,
+                                    ""properties"": {
+                                        ""id""    : {
+                                            ""type""  : ""integer""
+                                        },
+                                        ""name""  : {
+                                            ""type""  : ""string"",
+                                            ""minLength"": 1
+                                        },
+                                        ""price"" : {
+                                            ""type"": ""integer""
+                                        },
+                                        ""stock"": {
+                                            ""type"": ""integer""
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}
+";
+                string msg, check;
+                msg = @"{""Items"": { ""sales"": { ""0"":{""id"":10,""name"":""fred"",""price"":100,""stock"":200} } } }";
+                check = JSONSchema.Validate(schema, msg);
+                Check.That(check).IsEmpty();
+            }
+
+
+
+            {                                                           // check for 2-3 properties
+                string schema = @"
+{
+    ""type""                  : ""object"",
+    ""properties"": {
+        ""Items"": {
+            ""properties"": {
+                ""sales"": {
+                    ""anyOf"": [
+                        {
+                            ""type"": ""array"",
+                            ""$comment"": ""If there are no items then sales is an empty array"",
+                            ""minItems"": 0,
+                            ""maxItems"": 0
+                        },
+                        {
+                            ""type"": ""object"",
+                            ""additionalProperties"":false,
+        
+                            ""patternProperties"": {
+                                ""^[0-9]+$"": {
+                                    ""type""      : ""object"",
+                                    ""required""  : [ ""id"", ""name"", ""price"", ""stock"" ],
+                                    ""additionalProperties"": false,
+                                    ""properties"": {
+                                        ""id""    : {
+                                            ""type""  : ""integer""
+                                        },
+                                        ""name""  : {
+                                            ""type""  : ""string"",
+                                            ""minLength"": 1
+                                        },
+                                        ""price"" : {
+                                            ""type"": ""integer""
+                                        },
+                                        ""stock"": {
+                                            ""type"": ""integer""
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}
+";
+                string msg, check;
+                //   check = JSONSchema.Validate(schema);
+                //    Check.That(check).IsEmpty();
+
+
+                msg = @"{""Items"": { ""sales"": { ""0"":{""id"":10,""name"":""fred"",""price"":100,""stock"":200, ""add"":1} } } }";
+                check = JSONSchema.Validate(schema, msg);
+                Check.That(check).Contains("but do not match patternProperties or properties");
+
+                msg = @"{""Items"": { ""sales"": { ""0"":{""id"":10,""name"":""fred"",""price"":100,""stock"":200} } } }";
+                check = JSONSchema.Validate(schema, msg);
+                Check.That(check).IsEmpty();
+
+                msg = @"{""Items"": { ""sales"": { ""0"":{""id"":10,""name"":""fred"",""price"":100} } } }";
+                check = JSONSchema.Validate(schema, msg);
+                Check.That(check).Contains("Property stock is missing in object");
+
+                msg = @"{""Items"": { ""sales"": [] } }";
+                check = JSONSchema.Validate(schema, msg);
+                Check.That(check).IsEmpty();
+
+                msg = @"{""Items"": { ""sales"": 20 } }";
+                check = JSONSchema.Validate(schema, msg);
+                Check.That(check).Contains("is not allowed at");
+
+            }
+
+
             if (true)
             {
                 string schema = @"{
@@ -58,7 +288,7 @@ namespace JSONTests
     ""street_type"" : ""Avenue""
 }";
                     string err =JSONSchema.Validate(schema, data);
-                    Check.That(err).IsNotEmpty();
+                    Check.That(err).Contains("Input of type string is not allowed");
                 }
                 {
                     string data = @"{
@@ -67,7 +297,7 @@ namespace JSONTests
     ""street_type"" : ""AvenueX""
 }";
                     string err =JSONSchema.Validate(schema, data);
-                    Check.That(err).IsNotEmpty();
+                    Check.That(err).Contains("input does not match any enum");
                 }
                 {
                     string data = @"{
@@ -109,10 +339,20 @@ namespace JSONTests
                 {
                     string data = @"{
     ""number"": 20,
+    ""street_name"" : ""cossham""
+}";
+                    string err = JSONSchema.Validate(schema, data);
+                    Check.That(err).IsEmpty();
+                }
+
+
+                {
+                    string data = @"{
+    ""number"": 20,
     ""street_name"" : ""cossham"",
     ""street_type"" : ""Avenue""
 }";
-                    string err =JSONSchema.Validate(schema, data);
+                    string err = JSONSchema.Validate(schema, data);
                     Check.That(err).IsEmpty();
                 }
                 {
@@ -157,7 +397,7 @@ namespace JSONTests
     ""number"": 20,
     ""street_name"" : ""cossham""
 }";
-                    string err =JSONSchema.Validate(schema, data);
+                    string err = JSONSchema.Validate(schema, data);
                     Check.That(err).IsEmpty();
                 }
                 {
@@ -224,6 +464,10 @@ namespace JSONTests
                 }
             }
 
+
+
+
+
             // check maxitems/minitems
             // check string maxlength/minlength
             // check max value/min value for ints and numbers
@@ -252,7 +496,7 @@ namespace JSONTests
                 data = @"{ ""message"": { ""IsNewEntry"" : 20 } }";
                 jodata = JToken.Parse(data);
                 err = JSONSchema.Validate(schema, jodata);
-                Check.That(err).Contains("integer not allowed");
+                Check.That(err).Contains("not condition at");
 
 
 

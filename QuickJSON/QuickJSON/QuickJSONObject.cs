@@ -95,7 +95,16 @@ namespace QuickJSON
         public bool Contains(string name) { return Objects.ContainsKey(name); }
 
         /// <summary> Does the JObject contain all the listed properties</summary>
-        public bool ContainsThese(params string[] name) { return Objects.Where( kvp => name.Contains(kvp.Key)).Count() == name.Length; }
+        public bool ContainsAllOfThese(params string[] name) { return Objects.Where(kvp => name.Contains(kvp.Key)).Count() == name.Length; }
+
+        /// <summary> Does the JObject contain one of these? -1 no, else first one found.</summary>
+        public int ContainsIndexOf(params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) return i; } return -1; }
+
+        /// <summary> Does the JObject contain one of these? -1 no, else first one found.</summary>
+        public int ContainsIndexOf(out JToken ret, params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) { ret = Objects[name[i]]; return i; } } ret = null; return -1; }
+
+        /// <summary> Does the JObject contain one of these?</summary>
+        public bool ContainsAnyOf(params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) return true; } return false; }
 
         /// <summary> Return other property names not in this list</summary>
         public IEnumerable<string> UnknownProperties(params string[] name) { return Objects.Where(kvp => !name.Contains(kvp.Key)).Select(kvp=>kvp.Key); }

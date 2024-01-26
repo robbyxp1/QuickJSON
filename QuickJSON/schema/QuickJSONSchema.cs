@@ -23,10 +23,7 @@ namespace QuickJSON
     /// JSchema is a static class holding experimental schema decoders
     /// Implements most of 2022-12 https://json-schema.org/specification
     /// Except If/then/else
-    /// Except allof/oneof
-    /// Only not type implemented
     /// Except format (accepted not checked)
-    /// Except contains/maxcontains/mincontains
     /// </summary>
     public class JSONSchema
     {
@@ -174,13 +171,10 @@ namespace QuickJSON
         /// <param name="input">input, may be null, at this point</param>
         /// <param name="additionalpropertiesfeed">any additional properties inherited from above</param>
         /// <param name="allowarraycheck">allow an array check, used for certain array properties</param>
-        private void Parse(string jpath, JObject curschema, JToken input, JObject additionalpropertiesfeed = null, bool allowarraycheck = false)
+        private bool Parse(string jpath, JObject curschema, JToken input, JObject additionalpropertiesfeed = null, bool allowarraycheck = false)
         {
             if (!curschema.IsObject)
-            {
-                Errors += $"\nSchema point is not an object";
-                return;
-            }
+                return Error("Schema point is not an object");
 
             JObject schema = curschema.Object();
 
@@ -195,16 +189,14 @@ namespace QuickJSON
                     JToken tk = rootschema.GetTokenSchemaPath(path.Substring(2));
                     if (tk.Object() == null)
                     {
-                        Errors += $"\nSchema $ref {path} does not exist or is not an object";
-                        return;
+                        return Error($"Schema $ref {path} does not exist or is not an object");
                     }
                     parameters.Remove("$ref");      // remove this ref 
                     parameters.Merge(tk.Object());  // and merge in next set of info..
                 }
                 else
                 {
-                    Errors += $"\nSchema $ref {path} does not start with #/";
-                    return;
+                    return Error($"Schema $ref {path} does not start with #/");
                 }
             }
                 
@@ -214,29 +206,71 @@ namespace QuickJSON
                 parameters.Merge(additionalpropertiesfeed);
             }
 
-
-            if (parameters.Contains("anyOf"))
+            int of = parameters.ContainsIndexOf(out JToken ofobj, "anyOf", "oneOf", "allOf");
+            if ( of >= 0)
             {
-                JArray ao = parameters["anyOf"].Array();
-                bool good = true;
-                foreach (JObject a in ao)
+                if (ofobj.IsArray)
                 {
-                    string interrors = "";
-                    Parse(jpath, a, input);
-                    if (interrors.Length == 0)      // no errors, passed here
-                        good = true;
+                    string curerrors = Errors;
+                    int validatedcount = 0;
+
+                    foreach (JObject a in ofobj.Array())   // we will parse all to check all shchemasyntax.
+                    {
+                        if (Parse(jpath, a, input))       // one parsed!
+                        {
+                            validatedcount++;
+
+                            if (of == 0)        // any of, stop here, we are good
+                            {
+                                Errors = curerrors;     // reset 
+                                return true;
+                            }
+                        }
+                    }
+
+                    if ( of == 1 && validatedcount == 1)        // if oneof, and one validation
+                    {
+                        Errors = curerrors;     // reset 
+                        return true;
+                    }
+
+                    if ( of == 2 && validatedcount == ofobj.Count())    // if allof, and all validated
+                    {
+                        Errors = curerrors;     // reset 
+                        return true;
+                    }
+
+                    return Error($"any/one/allOf failed validation at {jpath}");
                 }
-
-                if (!good)
-                    Errors += $"\nAnyOf failed validation at {schema}";
-                return;
+                else
+                    return Error($"any/one/allOf is not an array at {jpath}");
             }
 
-            if (parameters.ContainsThese("allOf", "oneOf", "if", "then", "else"))
+            JToken not = parameters["not"];
+            if (not != null)
             {
-                Errors += $"Unimplemented parameter type";
-                return;
+                if (not.IsObject)
+                {
+                    if (input == null)          // we can't check the condition
+                        return true;
+
+                    string curerrors = Errors;
+                    if (Parse(jpath, not.Object(), input))       // parse it, if success, its a fail!
+                    {
+                        return Error($"not condition at {jpath} failed");
+                    }
+
+                    Errors = curerrors;     // reset
+                    return true;
+                }
+                else
+                {
+                    return Error($"not is not an object");
+                }
             }
+
+            if (parameters.ContainsAnyOf("if", "then", "else"))
+                return Error($"Unimplemented if/then/else");
 
             string[] baseproperties = new string[] { "title", "description", "default", "examples", "depreciated",  "readOnly", "writeOnly","$comment",
                                                     "$schema", "id", "definitions",
@@ -252,15 +286,15 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "enum" });
                 if (unknown.Count() > 0)
                 {
-                    Warnings += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)} {jpath}";
+                    Warnings += $"\nSchema at {jpath} has unknown unsupported properties '{string.Join(",", unknown)}";
                 }
 
                 JArray enums = parameters["enum"].Array();
 
                 if (enums != null)
                 {
-                    if (input == null)
-                        return;
+                    if (input == null)  // no input, good
+                        return true;
 
                     bool good = false;
                     foreach (JToken chk in enums)
@@ -271,13 +305,14 @@ namespace QuickJSON
                             break;
                         }
                     }
-                    if (!good)
-                        Errors += $"\ninput does not match any enum {parameters.Name} {input.TokenType}";
+
+                    if (good)
+                        return true;
+                    else
+                        return Error($"input does not match any enum at {jpath}");
                 }
                 else
-                    Errors += $"\nenum is not an array {jpath}";
-
-                return;
+                    return Error($"enum is not an array at {jpath}");
             }
 
             if (parameters.Contains("const"))       // V6.1.3
@@ -287,73 +322,24 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "const" });
                 if (unknown.Count() > 0)
                 {
-                    Warnings += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)} {jpath}";
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}";
                 }
 
                 JToken enumv = parameters["const"];
 
                 if (input == null)      // no input, okay
-                    return;
+                    return true;
 
                 if (enumv.ValueEquals(input))
-                {
-                    return;
-                }
+                    return true;
                 else
-                {
-                    Errors += $"\ninput does not match any const {input.TokenType}";
-                    return;
-                }
+                    return Error($"input does not match any const at {input.TokenType}");
             }
-
-            string[] types = null;
 
             string inputtype = input != null ? GetSchemaType(input) : null;
 
-            JToken not = parameters["not"];
-            if (not != null)
-            {
-                if (not.IsObject)
-                {
-                    foreach (var kvp in not.Object())
-                    {
-                        if (kvp.Key == "type")
-                        {
-                            if (input == null)          // not type - no input, can't determine what the input type is, so we say okay
-                                return;
-
-                            if (kvp.Value.IsArray)
-                            {
-                                string[] values = kvp.Value.Array().Select(x => x.Str()).ToArray();
-                                if (values.Contains(inputtype))
-                                {
-                                    Errors += $"\nInput type {inputtype} not allowed due to Not Type";
-                                    return;
-                                }
-
-                                types = new string[] { "number", "integer", "null", "boolean", "object", "array", "string" };       // set types to any now, since we triaged it
-                            }
-                            else
-                            {
-                                Errors += $"\nnot type is not an array";
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            Errors += $"\nnot condition not implemented {kvp.Key}";
-                            return;
-                        }
-                    }
-                }
-                else
-                {
-                    Errors += $"\nnot is not an object";
-                    return;
-                }
-            }
-
-            if (types == null && parameters.Contains("type"))
+            string[] types = null;
+            if (parameters.Contains("type"))
                 types = parameters["type"].IsArray ? parameters["type"].Select(x => x.Str()).ToArray() : parameters["type"].IsString ? new string[] { parameters["type"].Str() } : null;
 
             if (types == null)                          // if there is no type, then presume its an object, and its just a shell to introduce another layer
@@ -372,14 +358,13 @@ namespace QuickJSON
                 }
                 else
                 {
-                    Errors += $"\nInput of type {inputtype} is not allowed for {string.Join(",", types)}";
-                    return;
+                    return Error($"Input of type {inputtype} is not allowed at {jpath} for {string.Join(",", types)}");
                 }
             }
             else
             {
-                if (types.Length > 1)     // multiple types, cannot process without data, good
-                    return;
+                if (types.Length > 1)   // multiple types, cannot process without data, good
+                    return true;
 
                 ptype = types[0];       // single type, pick 
             }
@@ -391,14 +376,13 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum" });
                 if (unknown.Count() > 0)
                 {
-                    Warnings += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)}' {jpath}";
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}'";
                 }
 
                 double? multipleOf = parameters["multipleOf"].DoubleNull();       // v6.2.1
                 if (multipleOf <= 0)
                 {
-                    Errors += $"\nMultipleOf is less or equal to zero";
-                    return;
+                    return Error($"MultipleOf at {jpath} is less or equal to zero");
                 }
 
                 double? maximum = parameters["maximum"].DoubleNull();   // v6.2.2
@@ -411,38 +395,43 @@ namespace QuickJSON
                     if (input.IsNull)
                     {
                         if (multipleOf.HasValue || maximum.HasValue || exclusiveMaximum.HasValue || minimum.HasValue || exclusiveMinimum.HasValue)
-                            Errors += $"\nValue is null but range applied to integer {jpath} {ptype} {input.TokenType}";
+                            return Error($"Value is null at {jpath} but range applied to number");
                     }
                     else if (input.IsNumber)
                     {
                         double v = input.Double();
                         if (v > maximum || v >= exclusiveMaximum)
-                            Errors += $"\nValue {jpath} is too large";
+                            return Error($"Value {jpath} is too large");
                         else if (v < minimum || v <= exclusiveMinimum)
-                            Errors += $"\nValue {jpath} is too small";
+                            return Error($"Value {jpath} is too small");
                         else if (multipleOf != null && v % multipleOf != 0)
-                            Errors += $"\nMultipleOf {jpath} failed";
+                            return Error($"MultipleOf {jpath} failed");
                     }
                     else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
                     {
+                        string curerrors = Errors;
+
                         foreach (JToken x in input.Array())
                         {
                             if (!IsOfType(x, ptype))
-                                Errors += $"\nArray check value is not {ptype} {jpath} {input.TokenType}";
+                                return Error($"Array check value at {jpath} is not {ptype}");
                             else
                             {
                                 double v = x.Double();
                                 if (v > maximum || v >= exclusiveMaximum)
-                                    Errors += $"\nValue {jpath} is too large";
+                                    Errors += $"Value {jpath} is too large";
                                 else if (v < minimum || v <= exclusiveMinimum)
-                                    Errors += $"\nValue {jpath} is too small";
+                                    Errors += $"Value {jpath} is too small";
                                 else if (multipleOf != null && v % multipleOf != 0)
-                                    Errors += $"\nMultipleOf {jpath} failed";
+                                    Errors += $"MultipleOf {jpath} failed";
                             }
                         }
+
+                        if (Errors != curerrors)
+                            return false;
                     }
                     else
-                        Errors += $"\nMismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}";       // should not get here, but double check
+                        return Error($"Mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");       // should not get here, but double check
                 }
             }
             else if (ptype == "integer")       // V6.2
@@ -450,14 +439,13 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum" });
                 if (unknown.Count() > 0)
                 {
-                    Warnings += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)}' {jpath}";
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}'";
                 }
 
                 long? multipleOf = parameters["multipleOf"].LongNull();      // tbd
                 if (multipleOf <= 0)
                 {
-                    Errors += $"\nMultipleOf is less or equal to zero";
-                    return;
+                    return Error($"MultipleOf at {jpath} is less or equal to zero");
                 }
 
                 long? maximum = parameters["maximum"].LongNull();
@@ -472,38 +460,41 @@ namespace QuickJSON
                     if (input.IsNull)
                     {
                         if (multipleOf.HasValue || maximum.HasValue || exclusiveMaximum.HasValue || minimum.HasValue || exclusiveMinimum.HasValue)
-                            Errors += $"\nValue is null but range applied to integer {jpath}";
+                            return Error($"Value is null at {jpath} but range applied to integer");
                     }
                     else if (input.IsInt)
                     {
                         long v = input.Long();
                         if (v > maximum || v >= exclusiveMaximum)
-                            Errors += $"\nValue {jpath} is too large";
+                            return Error($"Value {jpath} is too large");
                         else if (v < minimum || v <= exclusiveMinimum)
-                            Errors += $"\nValue {jpath} is too small";
+                            return Error($"Value {jpath} is too small");
                         else if (multipleOf != null && v % multipleOf != 0)
-                            Errors += $"\nMultipleOf {jpath} failed";
+                            return Error($"MultipleOf {jpath} failed");
                     }
                     else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
                     {
+                        string curerrors = Errors;
                         foreach (var x in input.Array())
                         {
                             if (!IsOfType(x, ptype))
-                                Errors += $"\nArray check value is not {ptype} {jpath} {input.TokenType}";
+                                return Error($"\nArray check value at {jpath} is not {ptype}");
                             else
                             {
                                 long v = x.Long();
                                 if (v > maximum || v >= exclusiveMaximum)
-                                    Errors += $"\nValue {jpath} is too large";
+                                    Errors += $"Value {jpath} is too large";
                                 else if (v < minimum || v <= exclusiveMinimum)
-                                    Errors += $"\nValue {jpath} is too small";
+                                    Errors += $"Value {jpath} is too small";
                                 else if (multipleOf != null && v % multipleOf != 0)
-                                    Errors += $"\nMultipleOf {jpath} failed";
+                                    Errors += $"MultipleOf {jpath} failed";
                             }
                         }
+                        if (Errors != curerrors)
+                            return false;
                     }
                     else
-                        Errors += $"\nMismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}";
+                        return Error($"Mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");
                 }
             }
             else if (ptype == "string")                                                  // V6.3
@@ -511,48 +502,53 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "maxLength", "minLength", "pattern", "format" });
                 if (unknown.Count() > 0)
                 {
-                    Warnings += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)}' {jpath}";
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}'";
                 }
 
                 int? maxLength = parameters["maxLength"].IntNull();     // v6.3.1
                 int? minLength = parameters["minLength"].IntNull();     // v6.3.2
-                string regex = parameters["pattern"].StrNull();         // v6.3.3
-                if (regex != null)
-                    System.Diagnostics.Debug.Assert(false, $"JSON Schema Unsupported pattern");
+
+                string pattern = parameters["pattern"].StrNull();         // v6.3.3
 
                 string format = parameters["format"].StrNull();     // not in 2020-12. 
                 if (format != null)
-                    System.Diagnostics.Debug.WriteLine($"JSON Schema Unsupported format ignored");
+                    Warnings += $"\nJSON Schema Unsupported format ignored at {jpath}";
 
                 if (input != null)
                 {
                     if (input.IsNull)
                     {
-                        if (maxLength.HasValue || minLength.HasValue || regex != null)
-                            Errors += $"\nValue is null but range applied to string {jpath} {ptype} {input.TokenType}";
+                        if (maxLength.HasValue || minLength.HasValue || pattern != null)
+                            return Error($"Value is null at {jpath} but range applied to string");
                     }
                     else if (input.IsString)
                     {
                         string v = input.Str();
                         if (v.Length > maxLength || v.Length < minLength)
-                            Errors += $"\nString Length is out of range {jpath} {ptype} {input.TokenType}";
+                            return Error($"String Length is out of range at {jpath}");
+                        else if ( pattern != null )
+                        {
+                            Regex reg = new Regex(pattern);
+                            if ( !reg.IsMatch(v))
+                                return Error($"String does not match regex {pattern} at {jpath}");
+                        }
                     }
                     else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
                     {
                         foreach (var x in input.Array())
                         {
                             if (!IsOfType(x, ptype))
-                                Errors += $"\nArray check value is not {ptype} {jpath} {input.TokenType}";
+                                return Error($"Array check value at {jpath} is not {ptype}");
                             else
                             {
                                 string v = x.Str();
                                 if (v.Length > maxLength || v.Length < minLength)
-                                    Errors += $"\nString Length is out of range in array {jpath} {ptype} {input.TokenType}";
+                                    return Error($"String Length is out of range in array at {jpath}");
                             }
                         }
                     }
                     else
-                        Errors += $"\nMismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}";
+                        return Error($"Mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");
                 }
             }
             else if (ptype == "array")              // v6.4
@@ -560,20 +556,28 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "maxItems", "minItems", "uniqueItems", "maxContains", "minContains", "contains", "items" });
                 if (unknown.Count() > 0)
                 {
-                    Warnings += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)} {jpath}";
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}";
                 }
 
                 int? maxItems = parameters["maxItems"].IntNull();           // v6.4.1
                 int? minItems = parameters["minItems"].IntNull();           // v6.4.2
                 bool? uniqueItems = parameters["uniqueItems"].BoolNull();   // v6.4.3
+
+                JObject contains = parameters["contains"].Object();         // c10.3.1.3
+                if (parameters.Contains("contains") && contains == null)
+                    return Error($"contains is not an schema at {jpath}");
+
                 int? maxContains = parameters["maxContains"].IntNull();     // v6.4.4
                 int? minContains = parameters["minContains"].IntNull();     // v6.4.5
-                JToken contains = parameters["contains"];                   // c10.3.1.3
 
                 JArray prefixitems = parameters["prefixItems"].Array();     // c10.3.1.1        either or
+                if (parameters.Contains("prefixItems") && prefixitems == null)
+                    return Error($"prefixItems is not an array at {jpath}");
+
                 JObject items = parameters["items"].Object();               // c10.3.1.2
 
-                System.Diagnostics.Debug.Assert(maxContains == null && minContains == null && contains == null, "Unimplemented");
+                if (parameters.Contains("items") && items == null)
+                    return Error($"items is not an array at {jpath}");
 
                 JArray ja = input.Array();
 
@@ -582,20 +586,18 @@ namespace QuickJSON
                     if (input.IsNull)
                     {
                         if (maxItems.HasValue || minItems.HasValue || uniqueItems.HasValue)
-                            Errors += $"\nValue is null but range applied to array {jpath} {ptype} {input.TokenType}";
-                        return;
+                            return Error($"Value is null at {jpath} but range applied to array");
                     }
 
                     if (ja == null)
                     {
-                        Errors += $"\nMismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}";
-                        return;
+                        return Error($"Mismatched type at {jpath} Wanted type {ptype} token type {input.TokenType}");
                     }
 
                     if (ja.Count > maxItems)
-                        Errors += $"\nArray has too many elements {jpath} {ptype} {input.TokenType}";
+                        return Error($"Array has too many elements at {jpath}");
                     else if (ja.Count < minItems)
-                        Errors += $"\nArray has too few elements {jpath} {ptype} {input.TokenType}";
+                        return Error($"Array has too few elements at {jpath}");
 
                     if (uniqueItems == true)
                     {
@@ -605,46 +607,66 @@ namespace QuickJSON
                             {
                                 if (item != item2 && item.ValueEquals(item2)) // if not the same item, but they compare the same
                                 {
-                                    Errors += $"\nDuplicate items in array {jpath} {ptype} {input.TokenType}";
-                                    return;
+                                    return Error($"Duplicate items in array at {jpath}");
                                 }
                             }
                         }
                     }
 
-                    if (prefixitems != null)
+                    string curerrors = Errors;
+
+                    int index = 0;
+
+                    if (prefixitems != null)    // see 10.3.1.2 paragraph 2 do prefix items, then items
                     {
-                        System.Diagnostics.Debug.Assert(!parameters.Contains("items"), "Unimplemented");   // eiter an object or true/false
-
-                        int index = 0;
-                        foreach (JToken item in ja)
+                        while (index < ja.Count && index < prefixitems.Count)       // for all items up to count, and if it has a prefix item, process it
                         {
-                            if (index < prefixitems.Count)      // good to not have enough prefix items, or for ja to be shorter
-                            {
-                                JObject subschema = prefixitems[index].Object();
+                            JObject subschema = prefixitems[index].Object();
 
-                                Parse(jpath + $"[{index}]", subschema, item);      // check item
-
-                                index++;
-                            }
-                            else
-                                break;
+                            Parse(jpath + $"[{index}]", subschema, ja[index]);   // test with subschema
+                            index++;
                         }
                     }
-                    else
+
+                    if (items != null) // see 10.3.1.2 paragraph 4 may be omitted
                     {
-                        if (items != null)
+                        while (index < ja.Count)       // for all items up to count, and if it has a prefix item, process it
                         {
-                            int index = 0;
-                            foreach (JToken item in ja)
+                            Parse(jpath + $"[{index}]", items, ja[index]);       // test with items schema
+                            index++;
+                        }
+                    }
+
+                    if (curerrors != Errors)        // we have errors, fail
+                        return false;
+
+                    if ( contains != null )     // run this schema over the data
+                    {
+                        if (minContains != 0)     // 0 means valid, don't test 10.3.1.3 P2
+                        {
+                            index = 0;
+                            int validated = 0;
+                            while (index < ja.Count)
                             {
-                                Parse(jpath + $"[{index}]", items, item);      // check item, allow array check 
+                                validated += Parse(jpath + $"[{index}]", contains, ja[index]) ? 1 : 0;      // if validated with no error, count it
                                 index++;
                             }
+
+                            Errors = curerrors;     // reset the error value
+
+                            if (minContains.HasValue)
+                            {
+                                if (validated < minContains)        // if we have a min contains, and we have less than it, error
+                                    return Error($"contains failed minimum at {jpath}");
+                            }
+                            else if ( validated == 0 )
+                                return Error($"contains found no matches in array at {jpath}");
+
+                            if (maxContains.HasValue && validated > maxContains)        // if we have a max contains, and we have more than it, error
+                                return Error($"contains failed maximum at {jpath}");
                         }
-                        else
-                            Errors += $"\nMissing Items/PrefixItems for array {jpath} {ptype} {input.TokenType}";
                     }
+
                 }
             }
             else if (ptype == "object")                                            // 6.5
@@ -652,24 +674,26 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "maxProperties", "minProperties", "required", "additionalProperties", "patternProperties", "properties" });
                 if (unknown.Count() > 0)
                 {
-                    Warnings += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)}' {jpath}";
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}";
                 }
 
                 int? maxProperties = parameters["maxProperties"].IntNull();     // v6.5.1
                 int? minProperties = parameters["minProperties"].IntNull();     // v6.5.2
                 string[] required = parameters.Contains("required") ? parameters["required"].ToObjectQ<string[]>() : new string[] { };  // v6.5.3
 
-                JToken patternProperties = parameters["patternProperties"];                  // c10.3.2.2
-                JToken additionalProperties = parameters["additionalProperties"];       // c10.3.2.3
+                JObject properties = parameters["properties"].Object();
+                if (parameters.Contains("properties") && properties == null)
+                    return Error($"properties is not an object at {jpath}");
+
+                JObject patternProperties = parameters["patternProperties"].Object();                  // c10.3.2.2
+                if (parameters.Contains("patternProperties") && patternProperties == null)
+                    return Error($"patternProperties is not an object at {jpath}");
+
+                JToken additionalProperties = parameters["additionalProperties"];       // c10.3.2.3 can be a bool or a schema
 
                 JObject propertyNames = parameters["propertyNames"].Object();           // c10.3.2.4
                 if (propertyNames == null && parameters.Contains("propertyNames"))      // check if not object
-                {
-                    Errors += $"\nPropertynames is not an object in object {jpath}";
-                    return;
-                }
-
-                JObject properties = parameters["properties"].Object();
+                    return Error($"\nPropertynames is not an object in object at {jpath}");
 
                 JObject inputobj = input.Object();
 
@@ -678,143 +702,117 @@ namespace QuickJSON
                     if (input.IsNull)
                     {
                         if (maxProperties.HasValue || minProperties.HasValue || required.Length > 0)
-                            Errors += $"\nValue is null but range applied to object {jpath}";
-                        return;
+                            return Error($"Value is null but range applied to object at {jpath}");
                     }
 
                     if (inputobj == null)
                     {
-                        Errors += $"\nMismatched type in object {jpath} Wanted type {ptype} token type {input.TokenType}";
-                        return;
+                        return Error($"Mismatched type in object at {jpath} Wanted type {ptype} token type {input.TokenType}");
                     }
 
                     if (inputobj.Count < minProperties)
-                        Errors += $"\nObject {jpath} has too few properties";
+                        return Error($"Object at {jpath} has too few properties");
 
                     if (inputobj.Count > maxProperties)
-                        Errors += $"\nObject {jpath} has too many properties";
+                        return Error($"Object at {jpath} has too many properties");
 
                     foreach (string x in required)
                     {
                         if (!inputobj.Contains(x))
-                            Errors += $"\nProperty {x} is missing in object {jpath}";
+                            return Error($"Property {x} is missing in object at {jpath}");
                     }
                 }
 
-                if (properties != null)
+                List<string> propertiesprocessed = new List<string>();
+                string curerrors = Errors;
+
+                if (patternProperties != null)
                 {
-                    foreach (var kvp in properties)     // for all properties..
+                    foreach (var kvp in patternProperties)
                     {
-                        if (kvp.Value.IsObject)         // check
+                        Regex ex = new Regex(kvp.Key);
+
+                        if (inputobj != null)
                         {
-                            if (inputobj != null)       
+                            foreach (var ikvp in inputobj)
                             {
-                                if (inputobj.Contains(kvp.Key))         // if input has the key, parse it. Else ignore, required properties picks up missing
+                                if (ex.IsMatch(ikvp.Key))      // if name matches
                                 {
-                                    Parse(jpath + "." + kvp.Key, kvp.Value.Object(),inputobj[kvp.Key], propertyNames);      // check item
+                                    propertiesprocessed.Add(ikvp.Key);  // mark processed
+
+                                    if (inputobj != null)
+                                    {
+                                        Parse(jpath + "." + kvp.Key, kvp.Value.Object(), ikvp.Value, propertyNames);      // check item as it matches against this schema
+                                    }
+                                    else
+                                        Parse(jpath + "." + kvp.Key, kvp.Value.Object(), null, propertyNames);      // check null input as it matches against this schema
                                 }
                             }
-                            else
-                                Parse(jpath + "." + kvp.Key, kvp.Value.Object(),  null, propertyNames);      // check syntax recurse
-                        }
-                        else
-                            Errors += $"\nProperty entry is not an object {jpath} {ptype} {input.TokenType} {kvp.Key}";
-                    }
-
-                    if (inputobj != null)       // check for additional properties
-                    {
-                        if (additionalProperties.Bool(true) == false) // if its set to false
-                        {
-                            int notinproperties = 0;
-                            foreach (var kvp in inputobj)
-                            {
-                                if (!properties.Contains(kvp.Key))
-                                    notinproperties++;
-                            }
-
-                            if (notinproperties > 0)
-                                Errors += $"\n{notinproperties} Properties are present in object {jpath} but not in property list in {inputobj.Name ?? "Unnamed Object"}";
-                        }
-                        else if (additionalProperties != null && additionalProperties.IsObject)     // schema to check properties against
-                        {
-                            foreach (var kvp in inputobj)       // additionalProperties is a schema, match
-                            {
-                                if (!properties.Contains(kvp.Key))    // if name is not in properties list, its additional ,schema match
-                                    Parse(jpath + "." + kvp.Key, additionalProperties.Object(), kvp.Value);      // check item
-                            }
                         }
                     }
-                }
-                else if (patternProperties != null)
+                } 
+
+                if ( properties != null )
                 {
-                    JObject pp = patternProperties.Object();
-                    if (pp != null)
+                    foreach (var ikvp in properties)     // for all properties..
                     {
-                        // names of properties, not matched at this part, empty if no data
-                        List<string> propertiesnotmatched = inputobj != null ? inputobj.PropertyNames().ToList() : new List<string>();
-
-                        foreach (var kvp in pp)
+                        if (ikvp.Value.IsObject)         // check
                         {
-                            Regex ex = new Regex(kvp.Key);
+                            propertiesprocessed.Add(ikvp.Key);      // mark processed
 
                             if (inputobj != null)
                             {
-                                foreach (var ikvp in inputobj)
+                                if (inputobj.Contains(ikvp.Key))         // if input has the key, parse it. Else ignore, required properties picks up missing
                                 {
-                                    if (ex.IsMatch(ikvp.Key))      // if name matches
-                                    {
-                                        propertiesnotmatched.Remove(ikvp.Key);
-
-                                        if (inputobj != null)
-                                        {
-                                            Parse(jpath + "." + kvp.Key, kvp.Value.Object(), ikvp.Value, propertyNames);      // check item as it matches against this schema
-                                        }
-                                        else
-                                            Parse(jpath + "." + kvp.Key, kvp.Value.Object(), null, propertyNames);      // check null input as it matches against this schema
-                                    }
+                                    Parse(jpath + "." + ikvp.Key, ikvp.Value.Object(), inputobj[ikvp.Key], propertyNames);      // check item
                                 }
+                            }
+                            else
+                                Parse(jpath + "." + ikvp.Key, ikvp.Value.Object(), null, propertyNames);      // check syntax recurse
+                        }
+                        else
+                            return Error($"Property entry is not an object at {jpath}");
+                    }
+                }
+
+                if (additionalProperties != null )
+                {
+                    if (additionalProperties.IsBool)             // if bool
+                    {
+                        if (additionalProperties.Bool() == false)
+                        {
+                            if (inputobj != null && inputobj.Count > propertiesprocessed.Count)
+                            {
+                                return Error($"Properties are present in object at {jpath} but do not match patternProperties or properties");
                             }
                         }
-
-                        if (inputobj != null)       // check for additional properties
+                    }
+                    else  if (additionalProperties.IsObject)     // schema to check properties against
+                    {
+                        if (inputobj != null)
                         {
-                            if (additionalProperties.Bool(true) == false) // if its set to false
+                            foreach (var kvp in inputobj)
                             {
-                                if (propertiesnotmatched.Count != 0)      // if we have dat
+                                if (!propertiesprocessed.Contains(kvp.Key))     // if not previously processed
                                 {
-                                    Errors += $"\nProperties are present in object {jpath} but do not match patternProperties";
-                                    return;
-                                }
-                            }
-                            else if (additionalProperties != null && additionalProperties.IsObject)     // schema to check properties against
-                            {
-                                foreach (var name in propertiesnotmatched)
-                                {
-                                    Parse(jpath + "." + name, additionalProperties.Object(), inputobj[name]);      // check item
+                                    Parse(jpath + "." + kvp.Key, additionalProperties.Object(), kvp.Value);      // check item
                                 }
                             }
                         }
                     }
                     else
-                    {
-                        Errors += $"\npatternProperties is not an object in object {jpath}";
-                        return;
-                    }
-                }
-                else
-                {
-                    Errors += $"\nNo properties defined for object {jpath}";
-                    return;
+                        return Error($"additionalProperties is not a schema at {jpath}");
                 }
 
+                if (curerrors != Errors)        // if we had errors, fail here
+                    return false;
             }
             else if (ptype == "boolean")        // no validation items
             {
                 var unknown = parameters.UnknownProperties(baseproperties);
                 if (unknown.Count() > 0)
                 {
-                    Errors += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)}' {jpath}";
-                    return;
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}";
                 }
 
                 if (input != null)
@@ -827,11 +825,11 @@ namespace QuickJSON
                         foreach (var x in input.Array())
                         {
                             if (!IsOfType(x, ptype))
-                                Errors += $"\nArray check value is not {ptype} {jpath} {input.TokenType}";
+                                return Error($"Array check value at {jpath} is not {ptype}");
                         }
                     }
                     else
-                        Errors += $"\nMismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}";
+                        return Error($"Mismatched type at {jpath} Wanted type {ptype} token type {input.TokenType}");
                 }
             }
             else if (ptype == "null")   // no validation items
@@ -839,20 +837,21 @@ namespace QuickJSON
                 var unknown = parameters.UnknownProperties(baseproperties);
                 if (unknown.Count() > 0)
                 {
-                    Errors += $"\nSchema has unknown unsupported properties '{string.Join(",", unknown)}' {jpath}";
-                    return;
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}";
                 }
 
                 if (input != null)
                 {
                     if (!input.IsNull)
-                        Errors += $"\nMismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}";
+                        return Error($"Mismatched type at {jpath} Wanted type null");
                 }
             }
             else
             {
-                Errors += $"\nUnknown schema type {ptype}";
+                return Error($"Unknown schema type {ptype}");
             }
+
+            return true;
         }
 
         private static string GetSchemaType(JToken input)
@@ -890,6 +889,16 @@ namespace QuickJSON
                 return false;
         }
 
+
+        private bool Error(string err)
+        {
+            if (Errors.Length > 0)
+                Errors += "\n" + err;
+            else
+                Errors = err;
+
+            return false;
+        }
 
         private JObject rootschema;
     }
