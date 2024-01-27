@@ -260,10 +260,12 @@ namespace JSONTests
 
             if (true)
             {
+                // bigint test
+
                 string schema = @"{
   ""type"": ""object"",
   ""properties"": {
-    ""number"": { ""type"": ""number"" },
+    ""number"": { ""type"": ""integer"", ""minimum"":0, ""exclusiveMaximum"":3029292988727272662625252222331314123412412 },
     ""street_name"": { ""type"": ""string"" },
     ""street_type"": { ""enum"": [""Street"", ""Avenue"", ""Boulevard""] }
   },
@@ -273,11 +275,23 @@ namespace JSONTests
 
                 {
                     string data = @"{
+                
+    ""number"": 2029292988727272662625252222331314123412412,
+    ""street_name"" : ""cossham"",
+    ""street_type"" : ""Avenue""
+}";
+                    string err = JSONSchema.Validate(schema, data);
+                    Check.That(err).IsEmpty();
+                }
+
+
+                {
+                    string data = @"{
     ""number"": 20,
     ""street_name"" : ""cossham"",
     ""street_type"" : ""Avenue""
 }";
-                    string err =JSONSchema.Validate(schema, data);
+                    string err = JSONSchema.Validate(schema, data);
                     Check.That(err).IsEmpty();
                 }
 

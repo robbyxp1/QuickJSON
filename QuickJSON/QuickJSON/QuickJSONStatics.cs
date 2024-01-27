@@ -231,12 +231,26 @@ namespace QuickJSON
                 return def;
             else if (token.TokenType == JToken.TType.ULong)
                 return (ulong)token.Value;
-            else if (token.IsLong && (long)token.Value >= 0)
-                return (ulong)(long)token.Value;
+            else if (token.IsLong )
+                return (long)token.Value;
             else if (token.TokenType == JToken.TType.BigInt)
                 return (System.Numerics.BigInteger)token.Value;
             else
                 return def;
+        }
+        /// <summary> Return a Big Integer. Return null if token is not present, not a number or null</summary>
+        public static System.Numerics.BigInteger? BigIntegerNull(this JToken token)
+        {
+            if (token == null)
+                return null;
+            else if (token.TokenType == JToken.TType.ULong)
+                return (ulong)token.Value;
+            else if (token.IsLong )
+                return (long)token.Value;
+            else if (token.TokenType == JToken.TType.BigInt)
+                return (System.Numerics.BigInteger)token.Value;
+            else
+                return null;
         }
 #endif
 

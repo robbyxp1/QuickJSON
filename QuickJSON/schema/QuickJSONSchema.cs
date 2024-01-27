@@ -171,14 +171,9 @@ namespace QuickJSON
         /// <param name="input">input, may be null, at this point</param>
         /// <param name="additionalpropertiesfeed">any additional properties inherited from above</param>
         /// <param name="allowarraycheck">allow an array check, used for certain array properties</param>
-        private bool Parse(string jpath, JObject curschema, JToken input, JObject additionalpropertiesfeed = null, bool allowarraycheck = false)
+        private bool Parse(string jpath, JObject schema, JToken input, JObject additionalpropertiesfeed = null, bool allowarraycheck = false)
         {
-            if (!curschema.IsObject)
-                return Error("Schema point is not an object");
-
-            JObject schema = curschema.Object();
-
-            JObject parameters = schema;
+            JObject parameters = schema;        // we clone parameters if we need to add stuff to it
 
             while (parameters.Contains("$ref"))        // in case of recursive refs..
             {
@@ -206,26 +201,35 @@ namespace QuickJSON
                 parameters.Merge(additionalpropertiesfeed);
             }
 
-            int of = parameters.ContainsIndexOf(out JToken ofobj, "anyOf", "oneOf", "allOf");
+            int of = parameters.ContainsIndexOf(out JToken ofobj, "anyOf", "oneOf", "allOf");   // find one of these, and return it
             if ( of >= 0)
             {
+                string cmdname = ofobj.Name;        // this is its name
+
                 if (ofobj.IsArray)
                 {
                     string curerrors = Errors;
                     int validatedcount = 0;
 
-                    foreach (JObject a in ofobj.Array())   // we will parse all to check all shchemasyntax.
+                    for( int index = 0; index < ofobj.Count; index++)
                     {
-                        if (Parse(jpath, a, input))       // one parsed!
+                        if (ofobj[index].IsObject)
                         {
-                            validatedcount++;
-
-                            if (of == 0)        // any of, stop here, we are good
+                            if (Parse(jpath + $".{cmdname}[{index}]", ofobj[index].Object(), input))       // one parsed!
                             {
-                                Errors = curerrors;     // reset 
-                                return true;
+                                validatedcount++;
+
+                                if (of == 0)        // any of, stop here, we are good
+                                {
+                                    Errors = curerrors;     // reset 
+                                    return true;
+                                }
                             }
+                            else
+                            {  }
                         }
+                        else
+                            return Error($"{cmdname} element {index} is not a schema");
                     }
 
                     if ( of == 1 && validatedcount == 1)        // if oneof, and one validation
@@ -240,10 +244,10 @@ namespace QuickJSON
                         return true;
                     }
 
-                    return Error($"any/one/allOf failed validation at {jpath}");
+                    return Error($"{cmdname} failed validation at {jpath}");
                 }
                 else
-                    return Error($"any/one/allOf is not an array at {jpath}");
+                    return Error($"{cmdname} is not an array at {jpath}");
             }
 
             JToken not = parameters["not"];
@@ -255,7 +259,7 @@ namespace QuickJSON
                         return true;
 
                     string curerrors = Errors;
-                    if (Parse(jpath, not.Object(), input))       // parse it, if success, its a fail!
+                    if (Parse(jpath + ".not", not.Object(), input))       // parse it, if success, its a fail!
                     {
                         return Error($"not condition at {jpath} failed");
                     }
@@ -265,7 +269,7 @@ namespace QuickJSON
                 }
                 else
                 {
-                    return Error($"not is not an object");
+                    return Error($"not is not a schema at {jpath}");
                 }
             }
 
@@ -277,7 +281,7 @@ namespace QuickJSON
                                                      "type", "enum", "const", 
                                                 };
 
-            System.Diagnostics.Debug.WriteLine($"At {parameters.Name} :  {parameters.ToString()}\r\n    given {input?.ToString()} ");
+            //System.Diagnostics.Debug.WriteLine($"At {parameters.Name} :  {parameters.ToString()}\r\n    given {input?.ToString()} ");
 
             if (parameters.Contains("enum"))       // V6.1.2
             {
@@ -336,8 +340,7 @@ namespace QuickJSON
                     return Error($"input does not match any const at {input.TokenType}");
             }
 
-            string inputtype = input != null ? GetSchemaType(input) : null;
-
+            // work out types listed, either an array or a single string
             string[] types = null;
             if (parameters.Contains("type"))
                 types = parameters["type"].IsArray ? parameters["type"].Select(x => x.Str()).ToArray() : parameters["type"].IsString ? new string[] { parameters["type"].Str() } : null;
@@ -347,14 +350,17 @@ namespace QuickJSON
 
             string ptype = null;
 
+            // work out input type.. if present
+            string inputtype = input != null ? GetSchemaType(input) : null;
+
             if (inputtype != null)      // we have input
             {
                 if (inputtype == "integer" && types.Contains("number") && !types.Contains("integer"))       // integer, and only number in there, deal as number
                     inputtype = "number";
 
-                if (types.Contains(inputtype))       // if we have an input type, 
+                if (types.Contains(inputtype))       // if we have a matching input to types
                 {
-                    ptype = inputtype;
+                    ptype = inputtype;              // select it as the type to check
                 }
                 else
                 {
@@ -381,25 +387,91 @@ namespace QuickJSON
 
                 double? multipleOf = parameters["multipleOf"].DoubleNull();       // v6.2.1
                 if (multipleOf <= 0)
-                {
                     return Error($"MultipleOf at {jpath} is less or equal to zero");
-                }
 
                 double? maximum = parameters["maximum"].DoubleNull();   // v6.2.2
                 double? exclusiveMaximum = parameters["exclusiveMaximum"].DoubleNull(); //v6.2.3
                 double? minimum = parameters["minimum"].DoubleNull();   // v6.2.4
                 double? exclusiveMinimum = parameters["exclusiveMinimum"].DoubleNull(); // v6.2.5
 
-                if (input != null)
+                if (input == null)
+                { }
+                else if (input.IsNull)
                 {
-                    if (input.IsNull)
+                    if (multipleOf.HasValue || maximum.HasValue || exclusiveMaximum.HasValue || minimum.HasValue || exclusiveMinimum.HasValue)
+                        return Error($"Value is null at {jpath} but range applied to number");
+                }
+                else if (input.IsNumber)
+                {
+                    double v = input.Double();
+                    if (v > maximum || v >= exclusiveMaximum)
+                        return Error($"Value {jpath} is too large");
+                    else if (v < minimum || v <= exclusiveMinimum)
+                        return Error($"Value {jpath} is too small");
+                    else if (multipleOf != null && v % multipleOf != 0)
+                        return Error($"MultipleOf {jpath} failed");
+                }
+                else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
+                {
+                    string curerrors = Errors;
+
+                    foreach (JToken x in input.Array())
+                    {
+                        if (!IsOfType(x, ptype))
+                            return Error($"Array check value at {jpath} is not {ptype}");
+                        else
+                        {
+                            double v = x.Double();
+                            if (v > maximum || v >= exclusiveMaximum)
+                                Errors += $"Value {jpath} is too large";
+                            else if (v < minimum || v <= exclusiveMinimum)
+                                Errors += $"Value {jpath} is too small";
+                            else if (multipleOf != null && v % multipleOf != 0)
+                                Errors += $"MultipleOf {jpath} failed";
+                        }
+                    }
+
+                    if (Errors != curerrors)
+                        return false;
+                }
+                else
+                    return Error($"Mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");       // should not get here, but double check
+            }
+            else if (ptype == "integer")       // V6.2
+            {
+                var unknown = parameters.UnknownProperties(baseproperties, new string[] { "multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum" });
+                if (unknown.Count() > 0)
+                {
+                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}'";
+                }
+
+                // if any element here is a bigint, must treat all as a bigint
+
+                bool bigint = (input?.IsBigInt ?? false) || (parameters["maximum"]?.IsBigInt ?? false) || (parameters["exclusiveMaximum"]?.IsBigInt ?? false) ||
+                    (parameters["minimum"]?.IsBigInt ?? false) || (parameters["exclusiveMinimum"]?.IsBigInt ?? false) || (parameters["multipleOf"]?.IsBigInt ?? false);
+
+                if (bigint)                         // big int!
+                {
+#if JSONBIGINT
+                    System.Numerics.BigInteger? multipleOf = parameters["multipleOf"].BigIntegerNull();
+                    if (multipleOf <= 0)
+                        return Error($"MultipleOf at {jpath} is less or equal to zero");
+
+                    System.Numerics.BigInteger? maximum = parameters["maximum"].BigIntegerNull();
+                    System.Numerics.BigInteger? exclusiveMaximum = parameters["exclusiveMaximum"].BigIntegerNull(); 
+                    System.Numerics.BigInteger? minimum = parameters["minimum"].BigIntegerNull();
+                    System.Numerics.BigInteger? exclusiveMinimum = parameters["exclusiveMinimum"].BigIntegerNull();
+
+                    if (input == null)
+                    { }
+                    else if (input.IsNull)
                     {
                         if (multipleOf.HasValue || maximum.HasValue || exclusiveMaximum.HasValue || minimum.HasValue || exclusiveMinimum.HasValue)
-                            return Error($"Value is null at {jpath} but range applied to number");
+                            return Error($"Value is null at {jpath} but range applied to integer");
                     }
-                    else if (input.IsNumber)
+                    else if (input.IsInt)
                     {
-                        double v = input.Double();
+                        System.Numerics.BigInteger v = input.BigInteger(0);
                         if (v > maximum || v >= exclusiveMaximum)
                             return Error($"Value {jpath} is too large");
                         else if (v < minimum || v <= exclusiveMinimum)
@@ -410,14 +482,13 @@ namespace QuickJSON
                     else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
                     {
                         string curerrors = Errors;
-
-                        foreach (JToken x in input.Array())
+                        foreach (var x in input.Array())
                         {
                             if (!IsOfType(x, ptype))
-                                return Error($"Array check value at {jpath} is not {ptype}");
+                                return Error($"\nArray check value at {jpath} is not {ptype}");
                             else
                             {
-                                double v = x.Double();
+                                System.Numerics.BigInteger v = x.BigInteger(0);
                                 if (v > maximum || v >= exclusiveMaximum)
                                     Errors += $"Value {jpath} is too large";
                                 else if (v < minimum || v <= exclusiveMinimum)
@@ -426,38 +497,29 @@ namespace QuickJSON
                                     Errors += $"MultipleOf {jpath} failed";
                             }
                         }
-
                         if (Errors != curerrors)
                             return false;
                     }
                     else
-                        return Error($"Mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");       // should not get here, but double check
+                        return Error($"Mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");
+#else
+                    return Error("BIGINT not supported");
+#endif
                 }
-            }
-            else if (ptype == "integer")       // V6.2
-            {
-                var unknown = parameters.UnknownProperties(baseproperties, new string[] { "multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum" });
-                if (unknown.Count() > 0)
-                {
-                    Warnings += $"\nSchema {jpath} has unknown unsupported properties '{string.Join(",", unknown)}'";
-                }
+                else
+                {                                               // otherwise long
+                    long? multipleOf = parameters["multipleOf"].LongNull();      // tbd
+                    if (multipleOf <= 0)
+                        return Error($"MultipleOf at {jpath} is less or equal to zero");
 
-                long? multipleOf = parameters["multipleOf"].LongNull();      // tbd
-                if (multipleOf <= 0)
-                {
-                    return Error($"MultipleOf at {jpath} is less or equal to zero");
-                }
+                    long? maximum = parameters["maximum"].LongNull();
+                    long? exclusiveMaximum = parameters["exclusiveMaximum"].LongNull();
+                    long? minimum = parameters["minimum"].LongNull();
+                    long? exclusiveMinimum = parameters["exclusiveMinimum"].LongNull();
 
-                long? maximum = parameters["maximum"].LongNull();
-                long? exclusiveMaximum = parameters["exclusiveMaximum"].LongNull();
-                long? minimum = parameters["minimum"].LongNull();
-                long? exclusiveMinimum = parameters["exclusiveMinimum"].LongNull();
-
-                System.Diagnostics.Debug.Assert(multipleOf == null, "Unimplemented");
-
-                if (input != null)
-                {
-                    if (input.IsNull)
+                    if (input == null)
+                    { }
+                    else if (input.IsNull)
                     {
                         if (multipleOf.HasValue || maximum.HasValue || exclusiveMaximum.HasValue || minimum.HasValue || exclusiveMinimum.HasValue)
                             return Error($"Value is null at {jpath} but range applied to integer");
@@ -497,7 +559,7 @@ namespace QuickJSON
                         return Error($"Mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");
                 }
             }
-            else if (ptype == "string")                                                  // V6.3
+            else if (ptype == "string")                 // V6.3
             {
                 var unknown = parameters.UnknownProperties(baseproperties, new string[] { "maxLength", "minLength", "pattern", "format" });
                 if (unknown.Count() > 0)
@@ -899,6 +961,7 @@ namespace QuickJSON
 
             return false;
         }
+
 
         private JObject rootschema;
     }
