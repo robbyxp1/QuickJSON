@@ -117,12 +117,14 @@ namespace QuickJSON
                 foreach (var e in jo)
                 {
                     bool notlast = i++ < jo.Count - 1;
+                    string name = e.Value.ParsedName;
+
                     if (e.Value is JObject || e.Value is JArray)
                     {
                         if (stringliterals)
-                            str.Append(objpad).Append(e.Key).Append(':').Append(postpad);
+                            str.Append(objpad).Append(name).Append(':').Append(postpad);
                         else
-                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(e.Key).Append("\":").Append(postpad);
+                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(name).Append("\":").Append(postpad);
 
                         ToStringBuilder(str,e.Value, objpad, postpad, oapad, stringliterals, ref lastcr, maxlinelength);
 
@@ -134,11 +136,10 @@ namespace QuickJSON
                     }
                     else
                     {
-
                         if (stringliterals)
-                            str.Append(objpad).Append(e.Key).Append(':');
+                            str.Append(objpad).Append(name).Append(':');
                         else
-                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(e.Key).Append("\":");
+                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(name).Append("\":");
 
                         ToStringBuilder(str, e.Value, "", "", oapad, stringliterals, ref lastcr, maxlinelength);
 

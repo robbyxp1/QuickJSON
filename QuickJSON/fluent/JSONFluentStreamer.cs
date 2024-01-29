@@ -18,9 +18,8 @@ using System.IO;
 namespace QuickJSON
 {
     /// <summary>
-    /// Quick formatter using Fluent syntax, quick and easy way to make a JSON string
+    /// Using Fluent syntax stream tokens to a stream, quick and easy way to make a JSON file without needing to hold the whole structure in memory
     /// </summary>
-
     public class JSONFormatterStreamer : JSONFormatter, IDisposable
     {
         /// <summary>

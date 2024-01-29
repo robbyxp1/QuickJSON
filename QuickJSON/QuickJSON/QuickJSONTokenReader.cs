@@ -32,24 +32,6 @@ namespace QuickJSON
         /// <summary> Read a token string and return one by one the JTokens. 
         /// Will return JToken EndArray and JToken EndObject to indicate end of those objects
         /// </summary>
-        /// <param name="text">JSON text</param>
-        /// <param name="flags">JSON Parser flags</param>
-        /// <param name="charbufsize">Maximum length of a JSON element</param>
-        /// <exception cref="QuickJSON.JToken.TokenException">Exception when token reader fails
-        /// </exception>
-        /// <returns>Next token, or Null at end of text</returns>
-        public static IEnumerable<JToken> ParseToken(string text, JToken.ParseOptions flags = JToken.ParseOptions.None, int charbufsize = 16384)
-        {
-            using (StringReader sr = new StringReader(text))         // read directly from file..
-            {
-                var parser = new StringParserQuickTextReader(sr, charbufsize);
-                return ParseToken(parser, flags, charbufsize);
-            }
-        }
-
-        /// <summary> Read a token string and return one by one the JTokens. 
-        /// Will return JToken EndArray and JToken EndObject to indicate end of those objects
-        /// </summary>
         /// <param name="tr">A text reader to get the text from</param>
         /// <param name="flags">JSON Parser flags</param>
         /// <param name="charbufsize">Maximum length of a JSON element</param>
@@ -161,9 +143,9 @@ namespace QuickJSON
                         }
                         else if (next == '"')   // property name
                         {
-                            int textlen = parser.NextQuotedString(next, textbuffer, true);
+                            int textlen = parser.NextQuotedString(next, textbuffer, true);      // names can be empty
 
-                            if (textlen < 1 || (comma == false && curobject.Count > 0) || !parser.IsCharMoveOn(':'))
+                            if (textlen < 0 || (comma == false && curobject.Count > 0) || !parser.IsCharMoveOn(':'))
                             {
                                 throw new TokenException(GenErrorString(parser, "Object missing property name"));
                             }
@@ -193,7 +175,7 @@ namespace QuickJSON
                                 }
                                 else
                                 {
-                                    o.Name = name;
+                                    o.Name = name;              // we keep the name, even if its a repeat or an empty string. OriginalName stays empty
                                     o.Level = sptr;
 
                                     yield return o;

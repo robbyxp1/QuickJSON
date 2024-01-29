@@ -97,6 +97,27 @@ namespace QuickJSON
             return token != null ? (int?)token : null;
         }
 
+        /// <summary>
+        /// Try and get an integer
+        /// </summary>
+        /// <param name="token">token</param>
+        /// <param name="value">integer return</param>
+        /// <returns>true if token is not null and is an value which can convert to an integer </returns>
+        public static bool TryGetInt(this JToken token, out int value)
+        {
+            if (token != null)
+            {
+                int? res = (int?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+
         /// <summary> Return an unsigned integer. Return def if token is not present, not a number or null</summary>
         public static uint UInt(this JToken token, uint def = 0)
         {
@@ -111,6 +132,28 @@ namespace QuickJSON
         {
             return token != null ? (uint?)token : null;
         }
+
+        /// <summary>
+        /// Try and get an integer
+        /// </summary>
+        /// <param name="token">token</param>
+        /// <param name="value">integer return</param>
+        /// <returns>true if token is not null and is an value which can convert to an integer </returns>
+        public static bool TryGetUInt(this JToken token, out uint value)
+        {
+            if (token != null)
+            {
+                uint? res = (uint?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+
 
         /// <summary> Return a long. Return def if token is not present, not a number or null</summary>
         public static long Long(this JToken token, long def = 0)
@@ -127,6 +170,27 @@ namespace QuickJSON
             return token != null ? (long?)token : null;
         }
 
+        /// <summary>
+        /// Try and get an integer
+        /// </summary>
+        /// <param name="token">token</param>
+        /// <param name="value">integer return</param>
+        /// <returns>true if token is not null and is an value which can convert to an integer </returns>
+        public static bool TryGetLong(this JToken token, out long value)
+        {
+            if (token != null)
+            {
+                long? res = (long?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+
         /// <summary> Return an unsigned long. Return def if token is not present, not a number or null</summary>
         public static ulong ULong(this JToken token, ulong def = 0)
         {
@@ -140,6 +204,27 @@ namespace QuickJSON
         public static ulong? ULongNull(this JToken token)
         {
             return token != null ? (ulong?)token : null;
+        }
+
+        /// <summary>
+        /// Try and get an integer
+        /// </summary>
+        /// <param name="token">token</param>
+        /// <param name="value">integer return</param>
+        /// <returns>true if token is not null and is an value which can convert to an integer </returns>
+        public static bool TryGetULong(this JToken token, out ulong value)
+        {
+            if (token != null)
+            {
+                ulong? res = (ulong?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
         }
 
         /// <summary> Return a double. Return def if token is not present, not a number or null</summary>
@@ -182,6 +267,27 @@ namespace QuickJSON
             return null;
         }
 
+        /// <summary>
+        /// Try and get an double
+        /// </summary>
+        /// <param name="token">token</param>
+        /// <param name="value">double return</param>
+        /// <returns>true if token is not null and is an value which can convert to an double </returns>
+        public static bool TryGetDouble(this JToken token, out double value)
+        {
+            if (token != null)
+            {
+                double? res = (double?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+
         /// <summary> Return a float. Return def if token is not present, not a number or null</summary>
         public static float Float(this JToken token, float def = 0)
         {
@@ -222,6 +328,28 @@ namespace QuickJSON
 
             return null;
         }
+
+        /// <summary>
+        /// Try and get a float
+        /// </summary>
+        /// <param name="token">token</param>
+        /// <param name="value">float return</param>
+        /// <returns>true if token is not null and is an value which can convert to an float</returns>
+        public static bool TryGetFloat(this JToken token, out float value)
+        {
+            if (token != null)
+            {
+                float? res = (float?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+
 
 #if JSONBIGINT
         /// <summary> Return a Big Integer. Return def if token is not present, not a number or null</summary>
@@ -268,6 +396,28 @@ namespace QuickJSON
         {
             return token != null ? (bool?)token : null;
         }
+
+        /// <summary>
+        /// Try and get a bool
+        /// </summary>
+        /// <param name="token">token</param>
+        /// <param name="value">bool return</param>
+        /// <returns>true if token is not null and is an value which can convert to an bool</returns>
+        public static bool TryGetBool(this JToken token, out bool value)
+        {
+            if (token != null)
+            {
+                bool? res = (bool?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = false;
+            return false;
+        }
+
 
         /// <summary> Return a nullable DateTime with the parse of the string JToken. </summary>
         /// <param name="token">Token to convert. Must be a string. May be null.</param>

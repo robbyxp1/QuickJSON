@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2023 Robbyxp1 @ github.com
+ * Copyright © 2024-2024 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -15,9 +15,7 @@
 using NFluent;
 using NUnit.Framework;
 using QuickJSON;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace JSONTests
 {
@@ -28,6 +26,40 @@ namespace JSONTests
         [Test]
         public void JSONSchemaTest1()
         {
+            {
+                string schema = @"{
+  ""type"": ""object"",
+  ""patternProperties"": { """" : { ""type"" : ""number"" } },
+  ""propertyNames"" : { ""maxLength"":3, ""minLength"" : 3 }
+}
+";
+                string data = @"{
+    ""usd"" : 1,
+    ""Eur"" : 0.8,
+    ""cad"" : ""string"",
+    ""xx"" : 1.11
+}";
+
+                //using (StringReader sr = new StringReader(schema))         // read directly from file..
+                //{
+                //    foreach (var x in JToken.ParseToken(sr))
+                //    {
+                //        System.Diagnostics.Debug.WriteLine($"{x.GetSchemaTypeName()} : {x.Name} {x.IsEmptyName}");
+
+                //    }
+                //}
+
+                JObject jschema = JObject.Parse(schema);
+                string output = jschema.ToString(true);
+
+
+                string err = JSONSchema.Validate(schema, data);
+                Check.That(err).Contains("string is not allowed");
+                Check.That(err).Contains("string length is out of range at .propertyNames.xx");
+            }
+
+
+
             {
                 string schema = @"{
   ""type"": ""object"",
@@ -245,7 +277,7 @@ namespace JSONTests
 
                 msg = @"{""Items"": { ""sales"": { ""0"":{""id"":10,""name"":""fred"",""price"":100} } } }";
                 check = JSONSchema.Validate(schema, msg);
-                Check.That(check).Contains("Property stock is missing in object");
+                Check.That(check).Contains("property stock is missing in object");
 
                 msg = @"{""Items"": { ""sales"": [] } }";
                 check = JSONSchema.Validate(schema, msg);
@@ -584,7 +616,7 @@ namespace JSONTests
                 var eddndata = EDDNMessage(inlines[0], inlines[1]);
                 eddndata["message"].Object()["commodities"][1]["meanPrice"] = -20;
                 string errs = ValidateSchemaData(schema, eddndata);
-                Check.That(errs).Contains("[1].meanPrice is too small");                        //  Object stationName is missing in message object Object
+                Check.That(errs).Contains("meanPrice is too small");                        //  Object stationName is missing in message object Object
             }
         }
 

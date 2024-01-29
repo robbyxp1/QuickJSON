@@ -132,7 +132,9 @@ namespace QuickJSON
                 return res;
         }
 
-        /// <summary> Parse JSON text and produce a JToken tree. This is the lowest level parser allowing a buffer to be fed into it </summary>
+        /// <summary> Parse JSON text and produce a JToken tree. This is the lowest level parser allowing a buffer to be fed into it 
+        /// Note any empty name properties will be names !!!EmptyNameN!!! to make them unique and searchable
+        /// </summary>
         /// <param name="parser">A string parser based on IStringParserQuick</param>
         /// <param name="error">Null on success, or error text</param>
         /// <param name="flags">Parser flags</param>
@@ -195,20 +197,22 @@ namespace QuickJSON
             {
                 if (curobject != null)      // if object..
                 {
+                    int emptynamenumber = 0;        // empty "" names are converted to <!!!EmptyNameN!!!> so they can be dereferenced
+
                     while (true)
                     {
                         char next = parser.GetChar();
 
                         if (next == '}')    // end object
                         {
-                            parser.SkipSpace();
-
                             if (comma == true && (flags & ParseOptions.AllowTrailingCommas) == 0)
                             {
                                 return ParseError(parser, "Comma", flags, out error);
                             }
                             else
                             {
+                                parser.SkipSpace();
+
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
                                 {
@@ -228,9 +232,14 @@ namespace QuickJSON
                         }
                         else if (next == '"')   // property name
                         {
-                            int textlen = parser.NextQuotedString(next, textbuffer, true);
+                            if (comma == false && curobject.Count > 0)
+                            {
+                                return ParseError(parser, "Missing comma before property name", flags, out error);
+                            }
 
-                            if (textlen < 1 || (comma == false && curobject.Count > 0) )
+                            int textlen = parser.NextQuotedString(next, textbuffer, true);      // names can be empty
+
+                            if (textlen < 0 )
                             {
                                 return ParseError(parser, "Object missing property name", flags, out error);
                             }
@@ -240,7 +249,7 @@ namespace QuickJSON
                             }
                             else
                             {
-                                string name = new string(textbuffer, 0, textlen);
+                                string originalname = new string(textbuffer, 0, textlen);
 
                                 JToken o = parser.JNextValue(textbuffer, false);      // get value
 
@@ -264,10 +273,29 @@ namespace QuickJSON
                                 }
                                 else
                                 {
-                                    o.Level = sptr;
-                                    o.Name = name;                          // object gets the name, indicating its a property
+                                    if (originalname.Length == 0)       // if empty name, we give it an internal name, but keep the original for ToString()
+                                    {
+                                        o.Name = $"!!!EmptyName{emptynamenumber++.ToStringInvariant()}!!!";
+                                        o.OriginalName = originalname;
+                                    }
+                                    else if (curobject.Contains(originalname))          // if its a repeat..
+                                    {
+                                        int total = 0;
+                                        foreach (var kvp in curobject)
+                                        {
+                                            if (kvp.Key == originalname || (kvp.Key.StartsWith(originalname + "[") && kvp.Key.EndsWith("]")))        
+                                                total++;    // if we have a repeat increase count
+                                        }
 
-                                    curobject[name] = o;                    // assign to dictionary
+                                        o.Name = originalname + $"[{total.ToStringInvariant()}]";
+                                        o.OriginalName = originalname;
+                                    }
+                                    else
+                                        o.Name = originalname;                  // we keep originalname null for space reasons and to indicate Name is correct
+
+                                    o.Level = sptr;
+
+                                    curobject[o.Name] = o;                    // assign to dictionary
 
                                     if (o.TokenType == TType.Array)         // if array, we need to change to this as controlling object on top of stack
                                     {
@@ -341,10 +369,12 @@ namespace QuickJSON
                         {
                             if (comma == true && (flags & ParseOptions.AllowTrailingCommas) == 0)
                             {
-                                return ParseError(parser, "Comma", flags, out error);
+                                return ParseError(parser, "Trailing Comma found", flags, out error);
                             }
                             else
                             {
+                                parser.SkipSpace();
+
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
                                 {
@@ -365,7 +395,7 @@ namespace QuickJSON
                         }
                         else if ((comma == false && curarray.Count > 0))   // missing comma
                         {
-                            return ParseError(parser, "Comma", flags, out error);
+                            return ParseError(parser, "Missing Comma between array elements", flags, out error);
                         }
                         else
                         {
@@ -411,8 +441,10 @@ namespace QuickJSON
 
         static private string GenErrorString(IStringParserQuick parser, string text)
         {
-            string error = "JSON " + text + " at " + parser.Position + " " + parser.Line.Substring(0, parser.Position) + " <ERROR> "
-                            + parser.Line.Substring(parser.Position);
+            int pp = Math.Max(parser.Position - 1, 0);
+
+            string error = "JSON " + text + " at " + parser.Position + " " + parser.Line.Substring(0,pp) + " <ERROR> "
+                            + parser.Line.Substring(pp);
             System.Diagnostics.Debug.WriteLine(error);
             return error;
         }

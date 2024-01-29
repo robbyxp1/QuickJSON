@@ -63,8 +63,16 @@ namespace QuickJSON
         public TType TokenType { get; set; }
         /// <summary> Value of the token, if it has one </summary>
         public Object Value { get; set; }
-        /// <summary> Name of token if its a property of an JSON Object</summary>
+        /// <summary> Name of token if its a property of an JSON Object, or Null if not a property.
+        /// This is the Key in the dictionary of properties and must be unique.  
+        /// [] uses this name to find a property in an object
+        /// If it was empty on parse of JSON text, it will be called !!!EmptyNameN!!! N is 0..
+        /// If it was a repeat of another name on parse of JSON text, it will be called name[N} where N = 1..</summary>
         public string Name { get; set; }
+        /// <summary> Normally null, set if its an empty (if name was empty) or to the original name (if its a repeat) in the JSON text</summary>
+        public string OriginalName { get; set; }
+        /// <summary> The parsed name, either Name or OriginalName (if the property name was empty or a repeat)</summary>
+        public string ParsedName { get { return OriginalName ?? Name; } }
         /// <summary> Heirachy level, 0 onwards. Set in TokenReader and Parse.  Otherwise ignored. </summary>
         public int Level { get; set; }
 
@@ -100,6 +108,29 @@ namespace QuickJSON
         public bool IsEndArray { get { return TokenType == TType.EndArray; } }      // only seen for TokenReader
         /// <summary> Is the token an error token</summary>
         public bool IsInError { get { return TokenType == TType.Error; } }          // only seen for FromObject when asking for error return
+
+        /// <summary>Return JSON Schema name of the object </summary>
+        /// <returns>Schema type name or null for not json type</returns>
+        public string GetSchemaTypeName()                                       
+        {
+            if (IsInt)
+                return "integer";
+            else if (IsDouble)
+                return "number";
+            else if (IsString)
+                return "string";
+            else if (IsBool)
+                return "boolean";
+            else if (IsArray)
+                return "array";
+            else if (IsObject)
+                return "object";
+            else if (IsNull)
+                return "null";
+            else
+                System.Diagnostics.Debug.WriteLine($"{TokenType} is not a valid schema type");
+            return null;
+        }
 
         #region Construction
 
