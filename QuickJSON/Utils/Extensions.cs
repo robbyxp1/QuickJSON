@@ -297,7 +297,16 @@ namespace QuickJSON.Utils
                 return i;
             else
                 return null;
+        }
 
+        /// <summary>
+        /// Always quote the string, and replace " with \"
+        /// </summary>
+        /// <param name="obj">string</param>
+        /// <returns>quoted string</returns>
+        public static string AlwaysQuoteString(this string obj)
+        {
+            return "\"" + obj.Replace("\"", "\\\"") + "\"";
         }
     }
 }

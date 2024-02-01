@@ -63,18 +63,26 @@ namespace QuickJSON
         public TType TokenType { get; set; }
         /// <summary> Value of the token, if it has one </summary>
         public Object Value { get; set; }
-        /// <summary> Name of token if its a property of an JSON Object, or Null if not a property.
-        /// This is the Key in the dictionary of properties and must be unique.  
-        /// [] uses this name to find a property in an object
-        /// If it was empty on parse of JSON text, it will be called !!!EmptyNameN!!! N is 0..
-        /// If it was a repeat of another name on parse of JSON text, it will be called name[N} where N = 1..</summary>
+
+        /// <summary> Name of token found during parsing if its a property of an JSON Object, or Null if not a property.
+        /// Only set during Parse and ParseToken.  Not set on an compiler initialisation.
+        /// On Parse, if the property name is empty it will be called !!!EmptyNameN!!! N is 0..
+        /// If it is a repeat of a previous name, it will be called name[N] where N = 1..
+        /// JObject [] must have unique names for all objects
+        /// On ParseToken, this will be the name in the text, irrespective or empty or repeat.
+        /// </summary>
         public string Name { get; set; }
-        /// <summary> Normally null, set if its an empty (if name was empty) or to the original name (if its a repeat) in the JSON text</summary>
+        /// <summary> Normally null, set to the original name in Parse only if the name is empty or a repeat</summary>
         public string OriginalName { get; set; }
-        /// <summary> The parsed name, either Name or OriginalName (if the property name was empty or a repeat)</summary>
+        /// <summary> The parsed name, either Name or OriginalName (if the property name was empty or a repeat), set on Parse or ParseToken only</summary>
         public string ParsedName { get { return OriginalName ?? Name; } }
-        /// <summary> Heirachy level, 0 onwards. Set in TokenReader and Parse.  Otherwise ignored. </summary>
+
+        /// <summary> Heirachy level, 0 onwards. Set in Parse and ParseToken only</summary>
         public int Level { get; set; }
+
+        /// <summary> Is the token a property of an Object. Only set during Parse or ParseToken. 
+        /// Compiler initialiser will not have this set</summary>
+        public bool IsProperty { get { return Name != null; } }      
 
         /// <summary> Does the object have a Value. True for bool/string/number</summary>
         public bool HasValue { get { return Value != null;  } }
@@ -100,8 +108,6 @@ namespace QuickJSON
         public bool IsObject { get { return TokenType == TType.Object; } }
         /// <summary> Is the token a Null</summary>
         public bool IsNull { get { return TokenType == TType.Null; } }
-        /// <summary> Is the token a property of an Object</summary>
-        public bool IsProperty { get { return Name != null; } }                     // indicates that the object is an object property
         /// <summary> Is the token a End Object marker</summary>
         public bool IsEndObject { get { return TokenType == TType.EndObject; } }    // only seen for TokenReader
         /// <summary> Is the token a End Array marker</summary>

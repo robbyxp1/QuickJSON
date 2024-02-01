@@ -21,7 +21,7 @@ namespace QuickJSON
 {
     /// <summary>
     /// JSchema is a static class holding experimental schema decoders
-    /// Implements most of 2022-12 https://json-schema.org/specification
+    /// Implements 2022-12 https://json-schema.org/specification
     /// Except If/then/else
     /// Except format (accepted but not checked)
     /// </summary>
@@ -35,8 +35,9 @@ namespace QuickJSON
         /// Warnings encountered
         /// </summary>
         public string Warnings { get; private set; }
+
         /// <summary>
-        /// Create a schema entry
+        /// Create and load a schema 
         /// </summary>
         /// <param name="rootschema"></param>
         public JSONSchema(JObject rootschema)
@@ -167,11 +168,9 @@ namespace QuickJSON
         /// Parser
         /// </summary>
         /// <param name="jpath">Path of node</param>
-        /// <param name="curschema">schema at this point</param>
-        /// <param name="input">input, may be null, at this point</param>
-        /// <param name="additionalpropertiesfeed">any additional properties inherited from above</param>
-        /// <param name="allowarraycheck">allow an array check, used for certain array properties</param>
-        private bool Parse(string jpath, JObject schema, JToken input, JObject additionalpropertiesfeed = null, bool allowarraycheck = false)
+        /// <param name="schema">schema at this point</param>
+        /// <param name="input">input at this point. It may be null meaning just check schema</param>
+        private bool Parse(string jpath, JObject schema, JToken input)
         {
             JObject parameters = schema;        // we clone parameters if we need to add stuff to it
 
@@ -193,12 +192,6 @@ namespace QuickJSON
                 {
                     return Error($"Schema $ref {path} does not start with #/");
                 }
-            }
-                
-            if ( additionalpropertiesfeed != null )             // pushed properties
-            {
-                parameters = parameters.Clone().Object();       // we will aggregate them
-                parameters.Merge(additionalpropertiesfeed);
             }
 
             int of = parameters.ContainsIndexOf(out JToken ofobj, "anyOf", "oneOf", "allOf");   // find one of these, and return it
@@ -411,29 +404,6 @@ namespace QuickJSON
                     else if (multipleOf != null && v % multipleOf != 0)
                         return Error($"multipleOf {jpath} failed");
                 }
-                else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
-                {
-                    string curerrors = Errors;
-
-                    foreach (JToken x in input.Array())
-                    {
-                        if (!IsOfType(x, ptype))
-                            return Error($"Array check value at {jpath} is not {ptype}");
-                        else
-                        {
-                            double v = x.Double();
-                            if (v > maximum || v >= exclusiveMaximum)
-                                Errors += $"value {jpath} is too large";
-                            else if (v < minimum || v <= exclusiveMinimum)
-                                Errors += $"value {jpath} is too small";
-                            else if (multipleOf != null && v % multipleOf != 0)
-                                Errors += $"multipleOf {jpath} failed";
-                        }
-                    }
-
-                    if (Errors != curerrors)
-                        return false;
-                }
                 else
                     return Error($"mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");       // should not get here, but double check
             }
@@ -479,27 +449,6 @@ namespace QuickJSON
                         else if (multipleOf != null && v % multipleOf != 0)
                             return Error($"multipleOf {jpath} failed");
                     }
-                    else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
-                    {
-                        string curerrors = Errors;
-                        foreach (var x in input.Array())
-                        {
-                            if (!IsOfType(x, ptype))
-                                return Error($"\narray check value at {jpath} is not {ptype}");
-                            else
-                            {
-                                System.Numerics.BigInteger v = x.BigInteger(0);
-                                if (v > maximum || v >= exclusiveMaximum)
-                                    Errors += $"value {jpath} is too large";
-                                else if (v < minimum || v <= exclusiveMinimum)
-                                    Errors += $"value {jpath} is too small";
-                                else if (multipleOf != null && v % multipleOf != 0)
-                                    Errors += $"multipleOf {jpath} failed";
-                            }
-                        }
-                        if (Errors != curerrors)
-                            return false;
-                    }
                     else
                         return Error($"mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");
 #else
@@ -533,27 +482,6 @@ namespace QuickJSON
                             return Error($"value {jpath} is too small");
                         else if (multipleOf != null && v % multipleOf != 0)
                             return Error($"MultipleOf {jpath} failed");
-                    }
-                    else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
-                    {
-                        string curerrors = Errors;
-                        foreach (var x in input.Array())
-                        {
-                            if (!IsOfType(x, ptype))
-                                return Error($"\narray check value at {jpath} is not {ptype}");
-                            else
-                            {
-                                long v = x.Long();
-                                if (v > maximum || v >= exclusiveMaximum)
-                                    Errors += $"value {jpath} is too large";
-                                else if (v < minimum || v <= exclusiveMinimum)
-                                    Errors += $"value {jpath} is too small";
-                                else if (multipleOf != null && v % multipleOf != 0)
-                                    Errors += $"multipleOf {jpath} failed";
-                            }
-                        }
-                        if (Errors != curerrors)
-                            return false;
                     }
                     else
                         return Error($"mismatched type for {jpath} Wanted type {ptype} token type {input.TokenType}");
@@ -593,20 +521,6 @@ namespace QuickJSON
                         Regex reg = new Regex(pattern);
                         if ( !reg.IsMatch(v))
                             return Error($"string does not match regex {pattern} at {jpath}");
-                    }
-                }
-                else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
-                {
-                    foreach (var x in input.Array())
-                    {
-                        if (!IsOfType(x, ptype))
-                            return Error($"array check value at {jpath} is not {ptype}");
-                        else
-                        {
-                            string v = x.Str();
-                            if (v.Length > maxLength || v.Length < minLength)
-                                return Error($"string Length is out of range in array at {jpath}");
-                        }
                     }
                 }
                 else
@@ -893,18 +807,7 @@ namespace QuickJSON
 
                 if (input != null)
                 {
-                    if (input.IsBool || input.IsNull)
-                    {
-                    }
-                    else if (input.IsArray && allowarraycheck)        // due to checking an array due to items
-                    {
-                        foreach (var x in input.Array())
-                        {
-                            if (!IsOfType(x, ptype))
-                                return Error($"array check value at {jpath} is not {ptype}");
-                        }
-                    }
-                    else
+                    if (!input.IsBool && !input.IsNull)
                         return Error($"mismatched type at {jpath} Wanted type {ptype} token type {input.TokenType}");
                 }
             }
@@ -930,22 +833,6 @@ namespace QuickJSON
             return true;
         }
 
- 
-        private static bool IsOfType(JToken t, string name)
-        {
-            if (name == "string")
-                return t.IsString;
-            else if (name == "boolean")
-                return t.IsBool;
-            else if (name == "number")
-                return t.IsNumber;
-            else if (name == "integer")
-                return t.IsInt;
-            else
-                return false;
-        }
-
-
         private bool Error(string err)
         {
             if (Errors.Length > 0)
@@ -955,7 +842,6 @@ namespace QuickJSON
 
             return false;
         }
-
 
         private JObject rootschema;
     }

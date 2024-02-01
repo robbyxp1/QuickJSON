@@ -160,7 +160,7 @@ namespace QuickJSON
         /// <param name="allowoverwrite">Allows overwriting of this object members with other</param>
         public void Merge(JObject other, bool allowoverwrite = true)
         {
-            foreach (var kvp in other)
+            foreach (var kvp in other.Objects)
             {
                 if ( allowoverwrite || !this.Contains(kvp.Key))
                     this[kvp.Key] = kvp.Value;

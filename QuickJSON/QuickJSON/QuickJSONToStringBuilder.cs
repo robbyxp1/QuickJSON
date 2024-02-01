@@ -117,7 +117,7 @@ namespace QuickJSON
                 foreach (var e in jo)
                 {
                     bool notlast = i++ < jo.Count - 1;
-                    string name = e.Value.ParsedName;
+                    string name = e.Value.ParsedName ?? e.Key;          // so if its in the object we use the ParsedName, else we use Key
 
                     if (e.Value is JObject || e.Value is JArray)
                     {

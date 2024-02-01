@@ -24,7 +24,7 @@ namespace QuickJSON
     /// Quick formatter using Fluent syntax, quick and easy way to make a JSON string
     /// </summary>
 
-    public class JSONFormatter
+    public partial class JSONFormatter
     {
         /// <summary> QuickJSONFormatter Error exception</summary>
         public class FormatterException : Exception

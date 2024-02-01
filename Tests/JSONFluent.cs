@@ -12,11 +12,13 @@
  * governing permissions and limitations under the License.
  */
 
+using Microsoft.CSharp;
 using NFluent;
 using NUnit.Framework;
 using QuickJSON;
 using QuickJSON.Utils;
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -31,7 +33,7 @@ namespace JSONTests
     public class JSONFluentTests
     {
         [Test]
-        public void JSONFluent()
+        public void JSONFluentTest1()
         {
             {
                 var f1 = new JSONFormatter();
@@ -102,14 +104,68 @@ namespace JSONTests
                     memstream.Seek(0, SeekOrigin.Begin);
 
                     var enc = new System.Text.UTF8Encoding();
-                    using( TextReader tr = new StreamReader(memstream,enc))
+                    using (TextReader tr = new StreamReader(memstream, enc))
                     {
-                        foreach(var t in JToken.ParseToken(tr))
+                        foreach (var t in JToken.ParseToken(tr))
                         {
                             //System.Diagnostics.Debug.WriteLine($"Token {t.ToString()}");
                         }
                     }
                 }
+            }
+        }
+        [Test]
+        public void JSONFluentTest2()
+        {
+            {
+                JObject jo = new JObject
+                {
+                    ["Bool"] = true,
+                    ["Array"] = new JArray() { 1, 2, 3, "string" },
+                    ["Object"] = new JObject() { ["o1"] = 10, ["o2"] = "kww" },
+                    ["Decimal"] = 202020,
+                    ["Float"] = 202020.20
+                };
+
+                string fluentcode = JSONFormatter.ToFluent(jo);
+                System.Diagnostics.Debug.WriteLine("Fluent code is " + fluentcode);
+
+                string code = @"
+namespace code
+{
+    using System;
+    using QuickJSON;
+    public class test
+    {
+        public string func()
+        {
+            JSONFormatter fluent = new JSONFormatter();
+            fluent" + fluentcode + @";
+            // can't include, can't work out why, should be part of system System.Diagnostics.Debug.WriteLine(""Compiled code"");
+            return fluent.Get();
+        }
+    }
+}
+";
+                // round trip it
+                CodeDomProvider provider = CodeDomProvider.CreateProvider("C#");
+
+                // paras allow you to bring in assemblies and references
+
+                CompilerParameters para = new CompilerParameters();
+                para.ReferencedAssemblies.Add(@"C:\Code\QuickJSON\QuickJSON\bin\Debug\net48\QuickJSON.dll");        // hard coded for now
+
+                var result = provider.CompileAssemblyFromSource(para, code);
+                Check.That(result.Errors.Count).Equals(0);
+
+                var type = result.CompiledAssembly.GetType("code.test");
+                var instance = Activator.CreateInstance(type);
+                string json = (string)type.GetMethod("func").Invoke(instance, null);
+                JObject backtoobj = JObject.Parse(json);
+                Check.That(backtoobj).IsNotNull();
+
+                bool equals = backtoobj.DeepEquals(jo);
+                Check.That(equals).IsTrue();
             }
         }
 
