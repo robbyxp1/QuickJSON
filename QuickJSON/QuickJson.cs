@@ -1,16 +1,3 @@
-/*
- * Copyright © 2023 Robbyxp1 @ github.com
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
- * file except in compliance with the License. You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software distributed under
- * the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
- * ANY KIND, either express or implied. See the License for the specific language
- * governing permissions and limitations under the License.
- */
 using QuickJSON.Utils;
 using System;
 using System.Collections;
@@ -23,7 +10,7 @@ using System.Reflection;
 namespace QuickJSON
 {
     internal static class NamespaceDoc { } // just for documentation purposes
-    [System.Diagnostics.DebuggerDisplay("{TokenType} {ToString()}")]
+    [System.Diagnostics.DebuggerDisplay("L{Level}:{Name}:{TokenType}= {ToString()}")]
     public partial class JToken : IEnumerable<JToken>, IEnumerable
     {
         public enum TType {
@@ -41,8 +28,12 @@ namespace QuickJSON
             Error
         }
         public TType TokenType { get; set; }
-        public Object Value { get; set; }               
-        public string Name { get; set; }                        
+        public Object Value { get; set; }
+        public string Name { get; set; }
+        public string OriginalName { get; set; }
+        public string ParsedName { get { return OriginalName ?? Name; } }
+        public int Level { get; set; }
+        public bool IsProperty { get { return Name != null; } }      
         public bool HasValue { get { return Value != null;  } }
         public bool IsString { get { return TokenType == TType.String; } }
         public bool IsInt { get { return TokenType == TType.Long || TokenType == TType.ULong || TokenType == TType.BigInt; } }
@@ -50,14 +41,34 @@ namespace QuickJSON
         public bool IsBigInt { get { return TokenType == TType.BigInt; } }
         public bool IsULong { get { return TokenType == TType.ULong; } }
         public bool IsDouble { get { return TokenType == TType.Double; } }
+        public bool IsNumber { get { return TokenType == TType.Double || TokenType == TType.Long || TokenType == TType.ULong || TokenType == TType.BigInt; } }
         public bool IsBool { get { return TokenType == TType.Boolean; } }
         public bool IsArray { get { return TokenType == TType.Array; } }
         public bool IsObject { get { return TokenType == TType.Object; } }
         public bool IsNull { get { return TokenType == TType.Null; } }
-        public bool IsProperty { get { return Name != null; } }                     // indicates that the object is an object property
         public bool IsEndObject { get { return TokenType == TType.EndObject; } }    // only seen for TokenReader
         public bool IsEndArray { get { return TokenType == TType.EndArray; } }      // only seen for TokenReader
         public bool IsInError { get { return TokenType == TType.Error; } }          // only seen for FromObject when asking for error return
+        public string GetSchemaTypeName()                                       
+        {
+            if (IsInt)
+                return "integer";
+            else if (IsDouble)
+                return "number";
+            else if (IsString)
+                return "string";
+            else if (IsBool)
+                return "boolean";
+            else if (IsArray)
+                return "array";
+            else if (IsObject)
+                return "object";
+            else if (IsNull)
+                return "null";
+            else
+                System.Diagnostics.Debug.WriteLine($"{TokenType} is not a valid schema type");
+            return null;
+        }
         #region Construction
         public JToken()
         {
@@ -69,10 +80,9 @@ namespace QuickJSON
             Value = other.Value;
             Name = other.Name;
         }
-        
-        public JToken(TType tokentype, Object value = null)
+        public JToken(TType tokentype, Object value = null ,int level = 0)
         {
-            TokenType = tokentype; Value = value;
+            TokenType = tokentype; Value = value; Level = level;
         }
         public static implicit operator JToken(string v)        
         {
@@ -367,23 +377,6 @@ namespace QuickJSON
             else
                 return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
         }
-        public bool ValueEquals(Object value)               // NOTE not doing float/double due to approximations. Don't override Equals.
-        {
-            if (value is string)
-                return ((string)this) != null && ((string)this).Equals((string)value);
-            else if (value is int)
-                return ((int?)this) != null && ((int)this).Equals((int)value);
-            else if (value is uint)
-                return ((uint?)this) != null && ((uint)this).Equals((uint)value);
-            else if (value is ulong)
-                return ((ulong?)this) != null && ((ulong)this).Equals((ulong)value);
-            else if (value is long)
-                return ((long?)this) != null && ((long)this).Equals((long)value);
-            else if (value is bool)
-                return ((bool?)this) != null && ((bool)this).Equals((bool)value);
-            else
-                return false;
-        }
         public JToken Clone()   // make a copy of the token
         {
             switch (TokenType)
@@ -411,6 +404,122 @@ namespace QuickJSON
             }
         }
         #endregion
+        #region Equality
+        public bool ValueEquals(Object value)               
+        {
+            if (value is string)
+                return ((string)this) != null && ((string)this).Equals((string)value);
+            else if (value is int)
+                return ((int?)this) != null && ((int)this).Equals((int)value);
+            else if (value is uint)
+                return ((uint?)this) != null && ((uint)this).Equals((uint)value);
+            else if (value is ulong)
+                return ((ulong?)this) != null && ((ulong)this).Equals((ulong)value);
+            else if (value is long)
+                return ((long?)this) != null && ((long)this).Equals((long)value);
+            else if (value is bool)
+                return ((bool?)this) != null && ((bool)this).Equals((bool)value);
+            else
+                return false;
+        }
+        public bool ValueEquals(JToken other)
+        {
+            if( Value is string)
+            {
+                if (other.IsString)
+                    return ((string)Value).Equals((string)other);
+            }
+            else if (Value is long)
+            {
+                if (other.IsLong || other.IsDouble)
+                    return ((long)Value).Equals((long)other);
+            }
+            else if (Value is ulong)
+            {
+                if (other.IsULong)
+                    return ((ulong)Value).Equals((ulong)other);
+            }
+            else if (Value is double)
+            {
+                if (other.IsNumber)
+                    return ((double)Value).Equals((double)other);
+            }
+            else if (Value is bool)
+            {
+                if (other.IsBool)
+                    return ((bool)Value).Equals((bool)other);
+            }
+            else if (TokenType == TType.Null)
+            {
+                if (other.TokenType == TType.Null)
+                    return true;
+            }
+            return false;
+        }
+        #endregion
+        #region Paths
+        public JToken GetTokenSchemaPath(string path)
+        {
+            JToken token = this;
+            while ( path.Length>0)
+            {
+                if (!token.IsObject)
+                    return null;
+                int indexofslash = path.IndexOf("/");
+                string name = indexofslash == -1 ? path : path.Substring(0, indexofslash);
+                path = indexofslash == -1 ? "" : path.Substring(indexofslash + 1);
+                if (token.Object().Contains(name))
+                    token = token.Object()[name];
+                else
+                    return null;
+            }
+            return token;
+        }
+        public JToken GetToken(string path)
+        {
+            JToken token = this;
+            while (path.Length > 0)
+            {
+                if (token.IsArray)
+                {
+                    if (path[0] == '[')
+                    {
+                        int indexofbracket = path.IndexOf("]");
+                        if (indexofbracket == -1)
+                            return null;
+                        int? index = path.Substring(1, indexofbracket - 1).InvariantParseIntNull();
+                        if (index == null)
+                            return null;
+                        if (index >= token.Count || index < 0)
+                            return null;
+                        token = token[index];
+                        path = path.Substring(indexofbracket + 1);
+                    }
+                    else
+                        return null;
+                }
+                else if (token.IsObject)
+                {
+                    if (path[0] == '.')
+                    {
+                        path = path.Substring(1);
+                        int indexofdot = path.IndexOfAny(new char[] { '[', '.' });
+                        string name = indexofdot != -1 ? path.Substring(0, indexofdot) : path;
+                        path = indexofdot != -1 ? path.Substring(indexofdot) : "";
+                        if (token.Object().Contains(name))
+                            token = token[name];
+                        else
+                            return null;
+                    }
+                    else
+                        return null;
+                }
+                else
+                    return null;
+            }
+            return token;
+        }
+        #endregion
         #region Operators and functions
         public virtual JToken this[object key] { get { return null; } set { throw new NotImplementedException(); } }
         public virtual JToken First() { throw new NotImplementedException(); }
@@ -429,7 +538,7 @@ namespace QuickJSON
         internal virtual IEnumerator GetSubClassEnumerator() { throw new NotImplementedException(); }
         public virtual int Count { get { return 0; } }
         public virtual void Clear() { throw new NotImplementedException(); }    // clear all children
-#endregion
+        #endregion
     }
 }
 namespace QuickJSON
@@ -467,7 +576,8 @@ namespace QuickJSON
         public override JToken LastOrDefault() { return Elements.Count > 0 ? Elements[Elements.Count-1] : null; }
         public bool TryGetValue(int index, out JToken token) { if (index >= 0 && index < Elements.Count) { token = Elements[index]; return true; } else { token = null; return false; } }
         public override int Count { get { return Elements.Count; } }
-        public void Add(JToken o) { Elements.Add(o); }
+        public int IndexOf(JToken tk) { return Elements.IndexOf(tk); }
+        public void Add(JToken o) {Elements.Add(o); }
         public void AddRange(IEnumerable<JToken> o) { Elements.AddRange(o); }
         public void RemoveAt(int index) { Elements.RemoveAt(index); }
         public void RemoveRange(int index,int count) { Elements.RemoveRange(index,count); }
@@ -623,12 +733,24 @@ namespace QuickJSON
 namespace QuickJSON
 {
     public sealed class JsonIgnoreAttribute : Attribute 
-    {                                                           
+    {
+        public string[] Ignore { get; set; }
+        public string[] IncludeOnly { get; set; }
+        public JsonIgnoreAttribute() { }
+        public enum Operation {
+            Ignore,
+            Include
+        };
+        public JsonIgnoreAttribute(Operation ignoreorinclude, params string[] names) { if (ignoreorinclude==Operation.Include) IncludeOnly = names; else Ignore = names; }
     }
-    public sealed class JsonNameAttribute : Attribute 
+    public sealed class JsonNameAttribute : Attribute
     {
         public string[] Names { get; set; }
         public JsonNameAttribute(params string[] names) { Names = names; }
+    }
+    public sealed class JsonIgnoreIfNullAttribute : Attribute
+    {
+        public JsonIgnoreIfNullAttribute() {}
     }
     public partial class JToken
     {
@@ -637,22 +759,30 @@ namespace QuickJSON
             return FromObject(obj, false);
         }
         public static JToken FromObject(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
-            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static)
+            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
+            bool ignoreobjectpropertyifnull = false)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r.IsInError ? null : r;
         }
         public static JToken FromObjectWithError(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
-            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static)
+            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
+            bool ignoreobjectpropertyifnull = false)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r;
         }
-        private static JToken FromObjectInt(Object o, bool ignoreunserialisable, Type[] ignored, Stack<Object> objectlist, int lvl, int maxrecursiondepth, System.Reflection.BindingFlags membersearchflags )
+        private static JToken FromObjectInt(Object o, bool ignoreunserialisable, 
+                        Type[] ignoredtypes, Stack<Object> objectlist, 
+                        int lvl, int maxrecursiondepth, 
+                        System.Reflection.BindingFlags membersearchflags,
+                        HashSet<string> memberignore, HashSet<string> memberinclude,
+                        bool ignoreobjectpropertyifnull
+                        )
         {
             if (lvl >= maxrecursiondepth)
                 return new JToken();        // returns NULL
@@ -671,7 +801,7 @@ namespace QuickJSON
                         objectlist.Pop();
                         return new JToken(TType.Error, "Self Reference in IDictionary");
                     }
-                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);
+                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -705,7 +835,7 @@ namespace QuickJSON
                         objectlist.Pop();
                         return new JToken(TType.Error, "Self Reference in IEnumerable");
                     }
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);
+                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -725,24 +855,41 @@ namespace QuickJSON
                 objectlist.Push(o);
                 foreach (var mi in allmembers)
                 {
+                    string attrname = mi.Name;
+                    if ( (memberinclude != null && !memberinclude.Contains(attrname)) ||
+                            ( memberignore != null && memberignore.Contains(attrname)))
+                    {
+                        continue;
+                    }
                     Type innertype = null;
                     if (mi.MemberType == System.Reflection.MemberTypes.Property)
+                    {
                         innertype = ((System.Reflection.PropertyInfo)mi).PropertyType;
+                    }
                     else if (mi.MemberType == System.Reflection.MemberTypes.Field)
                     {
                         var fi = (System.Reflection.FieldInfo)mi;
                         innertype = fi.FieldType;
                     }
                     else
+                        continue;       // not a prop/field
+                    if (ignoredtypes != null && Array.IndexOf(ignoredtypes, innertype) >= 0)
                         continue;
-                    if (ignored != null && Array.IndexOf(ignored, innertype) >= 0)
-                        continue;
+                    HashSet<string> ignorelist = null;
+                    HashSet<string> includeonly = null;
                     var ca = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                    if (ca.Length > 0)                                              // ignore any ones with JsonIgnore on it.
-                        continue;
-                    string attrname = mi.Name;
+                    if (ca.Length > 0)                                             
+                    {
+                        JsonIgnoreAttribute jia = ca[0] as JsonIgnoreAttribute;
+                        if (jia.Ignore != null)
+                            ignorelist = jia.Ignore.ToHashSet();
+                        else if (jia.IncludeOnly != null)
+                            includeonly = jia.IncludeOnly.ToHashSet();
+                        else
+                            continue;   // ignore all with no lists
+                    }
                     var rename = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                    if (rename.Length == 1)                                         // any ones with a rename, use that name     
+                    if (rename.Length == 1)                                         
                     {
                         dynamic attr = rename[0];                                   // dynamic since compiler does not know rename type
                         attrname = attr.Names[0];                                   // only first entry is used for FromObject
@@ -765,7 +912,7 @@ namespace QuickJSON
                             objectlist.Pop();
                             return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
-                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignored, objectlist, lvl + 1, maxrecursiondepth, membersearchflags);     // may return End Object if not serializable
+                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, ignorelist, includeonly, ignoreobjectpropertyifnull);     // may return End Object if not serializable
                         if (token.IsInError)
                         {
                             if (!ignoreunserialisable)
@@ -779,7 +926,9 @@ namespace QuickJSON
                     }
                     else
                     {
-                        outobj[attrname] = JToken.Null();        // its null so its a JNull
+                        bool ignoreifnull = ignoreobjectpropertyifnull || mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false).Length == 1;
+                        if ( ignoreifnull == false)         
+                            outobj[attrname] = JToken.Null();        // its null so its a JNull
                     }
                 }
                 objectlist.Pop();
@@ -790,287 +939,6 @@ namespace QuickJSON
                 var r = JToken.CreateToken(o, false);        // return token or null indicating unserializable
                 return r ?? new JToken(TType.Error, "Unserializable " + tt.Name);
             }
-        }
-    }
-}
-namespace QuickJSON
-{
-    public static class JTokenExtensionsGet
-    {
-        public static JToken I(this JToken token, object id)           // safe [] allowing previous to be null
-        {
-            return token != null ? token[id] : null;
-        }
-        public static bool IsNull(this JToken token)
-        {
-            return token == null || token.IsNull;
-        }
-        public static string MultiStr(this JObject token, string[] propertynameslist, string def = "")       // multiple lookup in Object of names
-        {
-            JToken t = token?.Contains(propertynameslist);
-            return t != null && t.IsString ? (string)t.Value : def;
-        }
-        public static string Str(this JToken token, string def = "")       // if not string, or null, return def.
-        {
-            return token != null ? ((string)token ?? def) : def;
-        }
-        public static string StrNull(this JToken token)
-        {
-            return token != null ? (string)token : null;
-        }
-        public static T Enum<T>(this JToken token, T def)      
-        {
-            if (token != null && token.IsLong)
-            {
-                var i = (int)(long)token.Value;
-                return (T)System.Enum.ToObject(typeof(T), i);
-            }
-            else
-                return def;
-        }
-        public static T EnumStr<T>(this JToken token, T def, bool ignorecase = true) where T:struct    
-        {
-            if (token != null && token.IsString)
-            {
-                string s = (string)token.Value;
-                if (System.Enum.TryParse(s, ignorecase,out T result) )
-                {
-                    return result;
-                }
-            }
-            return def;
-        }
-        public static int Int(this JToken token, int def = 0)
-        {
-            if (token != null)
-                return (int?)token ?? def;
-            else
-                return def;
-        }
-        public static int? IntNull(this JToken token)
-        {
-            return token != null ? (int?)token : null;
-        }
-        public static uint UInt(this JToken token, uint def = 0)
-        {
-            if (token != null)
-                return (uint?)token ?? def;
-            else
-                return def;
-        }
-        public static uint? UIntNull(this JToken token)
-        {
-            return token != null ? (uint?)token : null;
-        }
-        public static long Long(this JToken token, long def = 0)
-        {
-            if (token != null)
-                return (long?)token ?? def;
-            else
-                return def;
-        }
-        public static long? LongNull(this JToken token)
-        {
-            return token != null ? (long?)token : null;
-        }
-        public static ulong ULong(this JToken token, ulong def = 0)
-        {
-            if (token != null)
-                return (ulong?)token ?? def;
-            else
-                return def;
-        }
-        public static ulong? ULongNull(this JToken token)
-        {
-            return token != null ? (ulong?)token : null;
-        }
-        public static double Double(this JToken token, double def = 0)
-        {
-            if (token != null)
-                return (double?)token ?? def;
-            else
-                return def;
-        }
-        public static double Double(this JToken token, double scale, double def)
-        {
-            if (token != null)
-            {
-                double? v = (double?)token;
-                if (v != null)
-                    return v.Value * scale;
-            }
-            return def;
-        }
-        public static double? DoubleNull(this JToken token)
-        {
-            return token != null ? (double?)token : null;
-        }
-        public static double? DoubleNull(this JToken token, double scale)
-        {
-            if ( token != null )
-            {
-                double? v = (double?)token;
-                if (v != null)
-                    return v.Value * scale;
-            }
-            return null;
-        }
-        public static float Float(this JToken token, float def = 0)
-        {
-            if (token != null)
-                return (float?)token ?? def;
-            else
-                return def;
-        }
-        public static float Float(this JToken token, float scale, float def)
-        {
-            if (token != null)
-            {
-                float? v = (float?)token;
-                if (v != null)
-                    return v.Value * scale;
-            }
-            return def;
-        }
-        public static float? FloatNull(this JToken token)
-        {
-            return token != null ? (float?)token : null;
-        }
-        public static float? FloatNull(this JToken token, float scale)
-        {
-            if (token != null)
-            {
-                float? v = (float?)token;
-                if (v != null)
-                    return v.Value * scale;
-            }
-            return null;
-        }
-#if JSONBIGINT
-        public static System.Numerics.BigInteger BigInteger(this JToken token, System.Numerics.BigInteger def)
-        {
-            if (token == null)
-                return def;
-            else if (token.TokenType == JToken.TType.ULong)
-                return (ulong)token.Value;
-            else if (token.IsLong && (long)token.Value >= 0)
-                return (ulong)(long)token.Value;
-            else if (token.TokenType == JToken.TType.BigInt)
-                return (System.Numerics.BigInteger)token.Value;
-            else
-                return def;
-        }
-#endif
-        public static bool Bool(this JToken token, bool def = false)
-        {
-            if ( token != null )
-                return (bool?)token ?? def;
-            else
-                return def;
-        }
-        public static bool? BoolNull(this JToken token)
-        {
-            return token != null ? (bool?)token : null;
-        }
-        public static DateTime? DateTime(this JToken token, System.Globalization.CultureInfo cultureinfo, System.Globalization.DateTimeStyles datetimestyle = System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal)
-        {
-            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, cultureinfo, datetimestyle, out DateTime ret))
-                return ret;
-            else
-                return null;
-        }
-        public static DateTime DateTime(this JToken token, DateTime def, System.Globalization.CultureInfo cultureinfo, System.Globalization.DateTimeStyles datetimestyle = System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal)
-        {
-            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, cultureinfo, datetimestyle, out DateTime ret))
-                return ret;
-            else
-                return def;
-        }
-        public static DateTime DateTimeUTC(this JToken token)
-        {
-            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
-                return ret;
-            else
-                return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
-        }
-        public static T Enumeration<T>(this JToken token, T def, Func<string, string> preprocess = null)
-        {
-            if (token != null && token.IsString)
-            {
-                try
-                {
-                    string v = (string)token.Value;
-                    if (preprocess != null)
-                        v = preprocess(v);
-                    return (T)System.Enum.Parse(typeof(T), v, true);
-                }
-                catch
-                {
-                }
-            }
-            return def;
-        }
-        public static JArray Array(this JToken token)       // null if not
-        {
-            return token as JArray;
-        }
-        public static JObject Object(this JToken token)     // null if not
-        {
-            return token as JObject;
-        }
-        public static JObject RenameObjectFields(this JToken jobject, string pattern, string replace, bool startswith = false)
-        {
-            JObject o = jobject.Object();
-            if (o != null)
-            {
-                JObject ret = new JObject();
-                foreach (var kvp in o)
-                {
-                    string name = kvp.Key;
-                    if (startswith)
-                    {
-                        if (name.StartsWith(pattern))
-                            name = replace + name.Substring(pattern.Length);
-                    }
-                    else
-                    {
-                        name = name.Replace(pattern, replace);
-                    }
-                    ret[name] = kvp.Value;
-                }
-                return ret;
-            }
-            else
-                return null;
-        }
-        public static JObject RenameObjectFieldsUnderscores(this JToken jo)
-        {
-            return jo.RenameObjectFields("_", "");
-        }
-        public static JObject RemoveObjectFieldsKeyPrefix(this JToken jo, string prefix)
-        {
-            return jo.RenameObjectFields(prefix, "", true);
-        }
-        public static JToken JSONParse(this string text, JToken.ParseOptions flags = JToken.ParseOptions.None)
-        {
-            if (text != null)
-                return JToken.Parse(text, flags);
-            else
-                return null;
-        }
-        public static JObject JSONParseObject(this string text, JToken.ParseOptions flags = JToken.ParseOptions.None)
-        {
-            if (text != null)
-                return JObject.Parse(text, flags);
-            else
-                return null;
-        }
-        public static JArray JSONParseArray(this string text, JToken.ParseOptions flags = JToken.ParseOptions.None)
-        {
-            if (text != null)
-                return JArray.Parse(text, flags);
-            else
-                return null;
         }
     }
 }
@@ -1113,6 +981,12 @@ namespace QuickJSON
         public override JToken LastOrDefault() { return Objects.Count > 0 ? Objects.Last().Value : null; }
         public string[] PropertyNames() { return Objects.Keys.ToArray(); }
         public bool Contains(string name) { return Objects.ContainsKey(name); }
+        public bool ContainsAllOfThese(params string[] name) { return Objects.Where(kvp => name.Contains(kvp.Key)).Count() == name.Length; }
+        public int ContainsIndexOf(params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) return i; } return -1; }
+        public int ContainsIndexOf(out JToken ret, params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) { ret = Objects[name[i]]; return i; } } ret = null; return -1; }
+        public bool ContainsAnyOf(params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) return true; } return false; }
+        public IEnumerable<string> UnknownProperties(params string[] name) { return Objects.Where(kvp => !name.Contains(kvp.Key)).Select(kvp=>kvp.Key); }
+        public IEnumerable<string> UnknownProperties(string[] name, params string[] name2) { return Objects.Where(kvp => !(name.Contains(kvp.Key) || name2.Contains(kvp.Key))).Select(kvp => kvp.Key); }
         public bool TryGetValue(string name, out JToken token) { return Objects.TryGetValue(name, out token); }
         public JToken Contains(string[] ids)     
         {
@@ -1123,8 +997,28 @@ namespace QuickJSON
             }
             return null;
         }
+        public bool Rename(string fromname, string newname)
+        {
+            if (Objects.ContainsKey(fromname))
+            {
+                Objects[newname] = Objects[fromname];
+                Objects.Remove(fromname);
+                return true;
+            }
+            else
+                return false;
+        }
+        
         public override int Count { get { return Objects.Count; } }
         public void Add(string key, JToken value) { this[key] = value; }
+        public void Merge(JObject other, bool allowoverwrite = true)
+        {
+            foreach (var kvp in other.Objects)
+            {
+                if ( allowoverwrite || !this.Contains(kvp.Key))
+                    this[kvp.Key] = kvp.Value;
+            }
+        }
         public bool Remove(string key) { return Objects.Remove(key); }
         public void Remove(params string[] key) { foreach (var k in key) Objects.Remove(k); }
         public void RemoveWildcard(string wildcard, bool caseinsensitive = false)       // use * ?
@@ -1309,12 +1203,13 @@ namespace QuickJSON
             JArray curarray = null;
             JObject curobject = null;
             {
-                JToken o = DecodeValue(parser, textbuffer, false);       // grab new value, not array end
+                JToken o = parser.JNextValue(textbuffer, false);       // grab new value, not array end
                 if (o == null)
                 {
                     return ParseError(parser, "No Obj/Array", flags, out error);
                 }
-                else if (o.TokenType == TType.Array)
+                o.Level = sptr;
+                if (o.TokenType == TType.Array)
                 {
                     stack[++sptr] = o;                      // push this one onto stack
                     curarray = o as JArray;                 // this is now the current array
@@ -1333,18 +1228,19 @@ namespace QuickJSON
             {
                 if (curobject != null)      // if object..
                 {
+                    int emptynamenumber = 0;        // empty "" names are converted to <!!!EmptyNameN!!!> so they can be dereferenced
                     while (true)
                     {
                         char next = parser.GetChar();
                         if (next == '}')    // end object
                         {
-                            parser.SkipSpace();
                             if (comma == true && (flags & ParseOptions.AllowTrailingCommas) == 0)
                             {
                                 return ParseError(parser, "Comma", flags, out error);
                             }
                             else
                             {
+                                parser.SkipSpace();
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
                                 {
@@ -1364,8 +1260,12 @@ namespace QuickJSON
                         }
                         else if (next == '"')   // property name
                         {
-                            int textlen = parser.NextQuotedString(next, textbuffer, true);
-                            if (textlen < 1 || (comma == false && curobject.Count > 0) )
+                            if (comma == false && curobject.Count > 0)
+                            {
+                                return ParseError(parser, "Missing comma before property name", flags, out error);
+                            }
+                            int textlen = parser.NextQuotedString(next, textbuffer, true);      // names can be empty
+                            if (textlen < 0 )
                             {
                                 return ParseError(parser, "Object missing property name", flags, out error);
                             }
@@ -1375,8 +1275,8 @@ namespace QuickJSON
                             }
                             else
                             {
-                                string name = new string(textbuffer, 0, textlen);
-                                JToken o = DecodeValue(parser, textbuffer, false);      // get value
+                                string originalname = new string(textbuffer, 0, textlen);
+                                JToken o = parser.JNextValue(textbuffer, false);      // get value
                                 if (o == null)
                                 {
                                     if ((flags & ParseOptions.IgnoreBadObjectValue) != 0)       // if we get a bad value, and flag set, try and move to the next start point
@@ -1397,8 +1297,26 @@ namespace QuickJSON
                                 }
                                 else
                                 {
-                                    o.Name = name;                          // object gets the name, indicating its a property
-                                    curobject[name] = o;                    // assign to dictionary
+                                    if (originalname.Length == 0)       // if empty name, we give it an internal name, but keep the original for ToString()
+                                    {
+                                        o.Name = $"!!!EmptyName{emptynamenumber++.ToStringInvariant()}!!!";
+                                        o.OriginalName = originalname;
+                                    }
+                                    else if (curobject.Contains(originalname))          // if its a repeat..
+                                    {
+                                        int total = 0;
+                                        foreach (var kvp in curobject)
+                                        {
+                                            if (kvp.Key == originalname || (kvp.Key.StartsWith(originalname + "[") && kvp.Key.EndsWith("]")))        
+                                                total++;    // if we have a repeat increase count
+                                        }
+                                        o.Name = originalname + $"[{total.ToStringInvariant()}]";
+                                        o.OriginalName = originalname;
+                                    }
+                                    else
+                                        o.Name = originalname;                  // we keep originalname null for space reasons and to indicate Name is correct
+                                    o.Level = sptr;
+                                    curobject[o.Name] = o;                    // assign to dictionary
                                     if (o.TokenType == TType.Array)         // if array, we need to change to this as controlling object on top of stack
                                     {
                                         if (sptr == stack.Length - 1)
@@ -1438,7 +1356,7 @@ namespace QuickJSON
                 {
                     while (true)
                     {
-                        JToken o = DecodeValue(parser, textbuffer, true);       // grab new value
+                        JToken o = parser.JNextValue(textbuffer, true);       // grab new value
                         if (o == null)
                         {
                             if ((flags & ParseOptions.IgnoreBadArrayValue) != 0)       // if we get a bad value, and flag set, try and move to the next start point
@@ -1467,10 +1385,11 @@ namespace QuickJSON
                         {
                             if (comma == true && (flags & ParseOptions.AllowTrailingCommas) == 0)
                             {
-                                return ParseError(parser, "Comma", flags, out error);
+                                return ParseError(parser, "Trailing Comma found", flags, out error);
                             }
                             else
                             {
+                                parser.SkipSpace();
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
                                 {
@@ -1491,10 +1410,11 @@ namespace QuickJSON
                         }
                         else if ((comma == false && curarray.Count > 0))   // missing comma
                         {
-                            return ParseError(parser, "Comma", flags, out error);
+                            return ParseError(parser, "Missing Comma between array elements", flags, out error);
                         }
                         else
                         {
+                            o.Level = sptr;
                             curarray.Add(o);
                             if (o.TokenType == TType.Array) // if array, we need to change to this as controlling object on top of stack
                             {
@@ -1527,57 +1447,11 @@ namespace QuickJSON
                 }
             }
         }
-        static JToken jendarray = new JToken(TType.EndArray);
-        static private JToken DecodeValue(IStringParserQuick parser, char[] textbuffer, bool inarray)
-        {
-            char next = parser.GetChar();
-            switch (next)
-            {
-                case '{':
-                    parser.SkipSpace();
-                    return new JObject();
-                case '[':
-                    parser.SkipSpace();
-                    return new JArray();
-                case '"':
-                    int textlen = parser.NextQuotedString(next, textbuffer, true);
-                    return textlen >= 0 ? new JToken(TType.String, new string(textbuffer, 0, textlen)) : null;
-                case ']':
-                    if (inarray)
-                    {
-                        parser.SkipSpace();
-                        return jendarray;
-                    }
-                    else
-                        return null;
-                case '0':       // all positive. JSON does not allow a + at the start (integer fraction exponent)
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9':
-                    parser.BackUp();
-                    return parser.JNextNumber(false);
-                case '-':
-                    return parser.JNextNumber(true);
-                case 't':
-                    return parser.IsStringMoveOn("rue") ? new JToken(TType.Boolean, true) : null;
-                case 'f':
-                    return parser.IsStringMoveOn("alse") ? new JToken(TType.Boolean, false) : null;
-                case 'n':
-                    return parser.IsStringMoveOn("ull") ? new JToken(TType.Null) : null;
-                default:
-                    return null;
-            }
-        }
         static private string GenErrorString(IStringParserQuick parser, string text)
         {
-            string error = "JSON " + text + " at " + parser.Position + " " + parser.Line.Substring(0, parser.Position) + " <ERROR> "
-                            + parser.Line.Substring(parser.Position);
+            int pp = Math.Max(parser.Position - 1, 0);
+            string error = "JSON " + text + " at " + parser.Position + " " + parser.Line.Substring(0,pp) + " <ERROR> "
+                            + parser.Line.Substring(pp);
             System.Diagnostics.Debug.WriteLine(error);
             return error;
         }
@@ -1595,6 +1469,403 @@ namespace QuickJSON
 }
 namespace QuickJSON
 {
+    public static class JTokenExtensionsGet
+    {
+        public static JToken I(this JToken token, object id)           // safe [] allowing previous to be null
+        {
+            return token != null ? token[id] : null;
+        }
+        public static bool IsNull(this JToken token)
+        {
+            return token == null || token.IsNull;
+        }
+        public static string MultiStr(this JObject token, string[] propertynameslist, string def = "")  
+        {
+            JToken t = token?.Contains(propertynameslist);
+            return t != null && t.IsString ? (string)t.Value : def;
+        }
+        public static string MultiStr(this JObject token, string def, params string[] propertynameslist)
+        {
+            JToken t = token?.Contains(propertynameslist);
+            return t != null && t.IsString ? (string)t.Value : def;
+        }
+        public static string Str(this JToken token, string def = "")       // if not string, or null, return def.
+        {
+            return token != null ? ((string)token ?? def) : def;
+        }
+        public static string StrNull(this JToken token)
+        {
+            return token != null ? (string)token : null;
+        }
+        public static T Enum<T>(this JToken token, T def)      
+        {
+            if (token != null && token.IsLong)
+            {
+                var i = (int)(long)token.Value;
+                return (T)System.Enum.ToObject(typeof(T), i);
+            }
+            else
+                return def;
+        }
+        public static T EnumStr<T>(this JToken token, T def, bool ignorecase = true) where T:struct    
+        {
+            if (token != null && token.IsString)
+            {
+                string s = (string)token.Value;
+                if (System.Enum.TryParse(s, ignorecase,out T result) )
+                {
+                    return result;
+                }
+            }
+            return def;
+        }
+        public static int Int(this JToken token, int def = 0)
+        {
+            if (token != null)
+                return (int?)token ?? def;
+            else
+                return def;
+        }
+        public static int? IntNull(this JToken token)
+        {
+            return token != null ? (int?)token : null;
+        }
+        public static bool TryGetInt(this JToken token, out int value)
+        {
+            if (token != null)
+            {
+                int? res = (int?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+        public static uint UInt(this JToken token, uint def = 0)
+        {
+            if (token != null)
+                return (uint?)token ?? def;
+            else
+                return def;
+        }
+        public static uint? UIntNull(this JToken token)
+        {
+            return token != null ? (uint?)token : null;
+        }
+        public static bool TryGetUInt(this JToken token, out uint value)
+        {
+            if (token != null)
+            {
+                uint? res = (uint?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+        public static long Long(this JToken token, long def = 0)
+        {
+            if (token != null)
+                return (long?)token ?? def;
+            else
+                return def;
+        }
+        public static long? LongNull(this JToken token)
+        {
+            return token != null ? (long?)token : null;
+        }
+        public static bool TryGetLong(this JToken token, out long value)
+        {
+            if (token != null)
+            {
+                long? res = (long?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+        public static ulong ULong(this JToken token, ulong def = 0)
+        {
+            if (token != null)
+                return (ulong?)token ?? def;
+            else
+                return def;
+        }
+        public static ulong? ULongNull(this JToken token)
+        {
+            return token != null ? (ulong?)token : null;
+        }
+        public static bool TryGetULong(this JToken token, out ulong value)
+        {
+            if (token != null)
+            {
+                ulong? res = (ulong?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+        public static double Double(this JToken token, double def = 0)
+        {
+            if (token != null)
+                return (double?)token ?? def;
+            else
+                return def;
+        }
+        public static double Double(this JToken token, double scale, double def)
+        {
+            if (token != null)
+            {
+                double? v = (double?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+            return def;
+        }
+        public static double? DoubleNull(this JToken token)
+        {
+            return token != null ? (double?)token : null;
+        }
+        public static double? DoubleNull(this JToken token, double scale)
+        {
+            if ( token != null )
+            {
+                double? v = (double?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+            return null;
+        }
+        public static bool TryGetDouble(this JToken token, out double value)
+        {
+            if (token != null)
+            {
+                double? res = (double?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+        public static float Float(this JToken token, float def = 0)
+        {
+            if (token != null)
+                return (float?)token ?? def;
+            else
+                return def;
+        }
+        public static float Float(this JToken token, float scale, float def)
+        {
+            if (token != null)
+            {
+                float? v = (float?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+            return def;
+        }
+        public static float? FloatNull(this JToken token)
+        {
+            return token != null ? (float?)token : null;
+        }
+        public static float? FloatNull(this JToken token, float scale)
+        {
+            if (token != null)
+            {
+                float? v = (float?)token;
+                if (v != null)
+                    return v.Value * scale;
+            }
+            return null;
+        }
+        public static bool TryGetFloat(this JToken token, out float value)
+        {
+            if (token != null)
+            {
+                float? res = (float?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = 0;
+            return false;
+        }
+#if JSONBIGINT
+        public static System.Numerics.BigInteger BigInteger(this JToken token, System.Numerics.BigInteger def)
+        {
+            if (token == null)
+                return def;
+            else if (token.TokenType == JToken.TType.ULong)
+                return (ulong)token.Value;
+            else if (token.IsLong )
+                return (long)token.Value;
+            else if (token.TokenType == JToken.TType.BigInt)
+                return (System.Numerics.BigInteger)token.Value;
+            else
+                return def;
+        }
+        public static System.Numerics.BigInteger? BigIntegerNull(this JToken token)
+        {
+            if (token == null)
+                return null;
+            else if (token.TokenType == JToken.TType.ULong)
+                return (ulong)token.Value;
+            else if (token.IsLong )
+                return (long)token.Value;
+            else if (token.TokenType == JToken.TType.BigInt)
+                return (System.Numerics.BigInteger)token.Value;
+            else
+                return null;
+        }
+#endif
+        public static bool Bool(this JToken token, bool def = false)
+        {
+            if ( token != null )
+                return (bool?)token ?? def;
+            else
+                return def;
+        }
+        public static bool? BoolNull(this JToken token)
+        {
+            return token != null ? (bool?)token : null;
+        }
+        public static bool TryGetBool(this JToken token, out bool value)
+        {
+            if (token != null)
+            {
+                bool? res = (bool?)token;
+                if (res.HasValue)
+                {
+                    value = res.Value;
+                    return true;
+                }
+            }
+            value = false;
+            return false;
+        }
+        public static DateTime? DateTime(this JToken token, System.Globalization.CultureInfo cultureinfo, System.Globalization.DateTimeStyles datetimestyle = System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal)
+        {
+            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, cultureinfo, datetimestyle, out DateTime ret))
+                return ret;
+            else
+                return null;
+        }
+        public static DateTime DateTime(this JToken token, DateTime def, System.Globalization.CultureInfo cultureinfo, System.Globalization.DateTimeStyles datetimestyle = System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal)
+        {
+            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, cultureinfo, datetimestyle, out DateTime ret))
+                return ret;
+            else
+                return def;
+        }
+        public static DateTime DateTimeUTC(this JToken token)
+        {
+            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
+                return ret;
+            else
+                return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
+        }
+        public static T Enumeration<T>(this JToken token, T def, Func<string, string> preprocess = null)
+        {
+            if (token != null && token.IsString)
+            {
+                try
+                {
+                    string v = (string)token.Value;
+                    if (preprocess != null)
+                        v = preprocess(v);
+                    return (T)System.Enum.Parse(typeof(T), v, true);
+                }
+                catch
+                {
+                }
+            }
+            return def;
+        }
+        public static JArray Array(this JToken token)       // null if not
+        {
+            return token as JArray;
+        }
+        public static JObject Object(this JToken token)     // null if not
+        {
+            return token as JObject;
+        }
+        public static JObject RenameObjectFields(this JToken jobject, string pattern, string replace, bool startswith = false)
+        {
+            JObject o = jobject.Object();
+            if (o != null)
+            {
+                JObject ret = new JObject();
+                foreach (var kvp in o)
+                {
+                    string name = kvp.Key;
+                    if (startswith)
+                    {
+                        if (name.StartsWith(pattern))
+                            name = replace + name.Substring(pattern.Length);
+                    }
+                    else
+                    {
+                        name = name.Replace(pattern, replace);
+                    }
+                    ret[name] = kvp.Value;
+                }
+                return ret;
+            }
+            else
+                return null;
+        }
+        public static JObject RenameObjectFieldsUnderscores(this JToken jo)
+        {
+            return jo.RenameObjectFields("_", "");
+        }
+        public static JObject RemoveObjectFieldsKeyPrefix(this JToken jo, string prefix)
+        {
+            return jo.RenameObjectFields(prefix, "", true);
+        }
+        public static JToken JSONParse(this string text, JToken.ParseOptions flags = JToken.ParseOptions.None)
+        {
+            if (text != null)
+                return JToken.Parse(text, flags);
+            else
+                return null;
+        }
+        public static JObject JSONParseObject(this string text, JToken.ParseOptions flags = JToken.ParseOptions.None)
+        {
+            if (text != null)
+                return JObject.Parse(text, flags);
+            else
+                return null;
+        }
+        public static JArray JSONParseArray(this string text, JToken.ParseOptions flags = JToken.ParseOptions.None)
+        {
+            if (text != null)
+                return JArray.Parse(text, flags);
+            else
+                return null;
+        }
+    }
+}
+namespace QuickJSON
+{
     public partial class JToken
     {
         public class TokenException : System.Exception
@@ -1602,17 +1873,9 @@ namespace QuickJSON
             public string Error { get; set; }
             public TokenException(string s) { Error = s; }
         }
-        public static IEnumerable<JToken> ParseToken(string text, JToken.ParseOptions flags = JToken.ParseOptions.None, int charbufsize = 16384)
-        {
-            using (StringReader sr = new StringReader(text))         // read directly from file..
-            {
-                var parser = new StringParserQuickTextReader(sr, 16384);
-                return ParseToken(parser, flags, charbufsize);
-            }
-        }
         public static IEnumerable<JToken> ParseToken(TextReader tr, JToken.ParseOptions flags = JToken.ParseOptions.None, int charbufsize = 16384)
         {
-            var parser = new StringParserQuickTextReader(tr, 16384);
+            var parser = new StringParserQuickTextReader(tr, charbufsize);
             return ParseToken(parser, flags, charbufsize);
         }
         public static IEnumerable<JToken> ParseToken(IStringParserQuick parser, JToken.ParseOptions flags = JToken.ParseOptions.None, int charbufsize = 16384)
@@ -1624,22 +1887,24 @@ namespace QuickJSON
             }
             return res;
         }
-        private static IEnumerable<JToken> ParseTokenInt(IStringParserQuick parser, JToken.ParseOptions flags = JToken.ParseOptions.None, int maxstringlen = 16384)
+        private static IEnumerable<JToken> ParseTokenInt(IStringParserQuick parser, JToken.ParseOptions flags, int maxstringlen)
         {
             char[] textbuffer = new char[maxstringlen];
-            JToken[] stack = new JToken[256];
+            JToken[] stack = new JToken[1024];
             int sptr = 0;
             bool comma = false;
             JArray curarray = null;
             JObject curobject = null;
             {
                 parser.SkipSpace();
-                JToken o = DecodeValue(parser, textbuffer, false);       // grab new value, not array end
+                JToken o = parser.JNextValue(textbuffer, false);       // grab new value, not array end
                 if (o == null)
                 {
                     throw new TokenException(GenErrorString(parser, "No Obj/Array"));
                 }
-                else if (o.TokenType == JToken.TType.Array)
+                o.Level = sptr;
+                
+                if (o.TokenType == JToken.TType.Array)
                 {
                     stack[++sptr] = o;                      // push this one onto stack
                     curarray = o as JArray;                 // this is now the current array
@@ -1673,7 +1938,7 @@ namespace QuickJSON
                             }
                             else
                             {
-                                yield return new JToken(JToken.TType.EndObject);
+                                yield return new JToken(JToken.TType.EndObject, level:sptr-1);
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
                                 {
@@ -1693,15 +1958,15 @@ namespace QuickJSON
                         }
                         else if (next == '"')   // property name
                         {
-                            int textlen = parser.NextQuotedString(next, textbuffer, true);
-                            if (textlen < 1 || (comma == false && curobject.Count > 0) || !parser.IsCharMoveOn(':'))
+                            int textlen = parser.NextQuotedString(next, textbuffer, true);      // names can be empty
+                            if (textlen < 0 || (comma == false && curobject.Count > 0) || !parser.IsCharMoveOn(':'))
                             {
                                 throw new TokenException(GenErrorString(parser, "Object missing property name"));
                             }
                             else
                             {
                                 string name = new string(textbuffer, 0, textlen);
-                                JToken o = DecodeValue(parser, textbuffer, false);      // get value
+                                JToken o = parser.JNextValue(textbuffer, false);      // get value
                                 if (o == null)
                                 {
                                     if ((flags & ParseOptions.IgnoreBadObjectValue) != 0)       // if we get a bad value, and flag set, try and move to the next start point
@@ -1722,7 +1987,8 @@ namespace QuickJSON
                                 }
                                 else
                                 {
-                                    o.Name = name;
+                                    o.Name = name;              // we keep the name, even if its a repeat or an empty string. OriginalName stays empty
+                                    o.Level = sptr;
                                     yield return o;
                                     if (o.TokenType == JToken.TType.Array) // if array, we need to change to this as controlling object on top of stack
                                     {
@@ -1731,7 +1997,7 @@ namespace QuickJSON
                                             throw new TokenException(GenErrorString(parser, "Stack overflow"));
                                         }
                                         stack[++sptr] = o;          // push this one onto stack
-                                        curarray = o as JArray;                 // this is now the current object
+                                        curarray = o as JArray;     // this is now the current object
                                         curobject = null;
                                         comma = false;
                                         break;
@@ -1763,7 +2029,7 @@ namespace QuickJSON
                 {
                     while (true)
                     {
-                        JToken o = DecodeValue(parser, textbuffer, true);       // grab new value
+                        JToken o = parser.JNextValue(textbuffer, true);       // grab new value
                         if (o == null)
                         {
                             throw new TokenException(GenErrorString(parser, "Bad array value"));
@@ -1776,7 +2042,7 @@ namespace QuickJSON
                             }
                             else
                             {
-                                yield return new JToken(JToken.TType.EndArray);
+                                yield return new JToken(JToken.TType.EndArray, level:sptr-1);
                                 JToken prevtoken = stack[--sptr];
                                 if (prevtoken == null)      // if popped stack is null, we are back to beginning, return this
                                 {
@@ -1801,6 +2067,7 @@ namespace QuickJSON
                         }
                         else
                         {
+                            o.Level = sptr;
                             yield return o;
                             if (o.TokenType == JToken.TType.Array) // if array, we need to change to this as controlling object on top of stack
                             {
@@ -1869,10 +2136,7 @@ namespace QuickJSON
                         if (!LoadTokens(enumerator))
                             return false;
                     }
-                    else
-                    {
-                        ja.Add(i);
-                    }
+                    ja.Add(i);
                 }
                 return false;
             }
@@ -1885,7 +2149,7 @@ namespace QuickJSON
 {
     public static class JTokenExtensions
     {
-        public static T ToObjectQ<T>(this JToken token)            // quick version, with checkcustomattr off
+        public static T ToObjectQ<T>(this JToken token)          
         {
             return ToObject<T>(token, false, false);
         }
@@ -1985,9 +2249,9 @@ namespace QuickJSON
                     else
                         return new ToObjectError($"JSONToObject: Not array {converttype.Name}");        // catch all ending
                 }
-                catch
+                catch (Exception ex)
                 {
-                    return new ToObjectError($"JSONToObject: Create Error {converttype.Name}");       
+                    return new ToObjectError($"JSONToObject: Create Error {converttype.Name} {ex.Message}");       
                 }
             }
             else if (token.TokenType == JToken.TType.Object)                   // objects are best efforts.. fills in as many fields as possible
@@ -2099,7 +2363,8 @@ namespace QuickJSON
                         if (mi != null)                                   // if we found a class member
                         {
                             var ca = checkcustomattr ? mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false) : null;
-                            if (ca == null || ca.Length == 0)                                              // ignore any ones with JsonIgnore on it.
+                            bool includeit = ca == null || ca.Length == 0 || (((JsonIgnoreAttribute)ca[0]).Ignore != null) || (((JsonIgnoreAttribute)ca[0]).IncludeOnly != null);
+                            if (includeit)                                              // ignore any ones with JsonIgnore on it which is empty of parameters
                             {
                                 Type otype = mi.FieldPropertyType();
                                 if (otype != null)                          // and its a field or property
@@ -2133,6 +2398,10 @@ namespace QuickJSON
                                     }
                                 }
                             }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"ToObject ignore {mi.Name}");
+                            }
                         }
                         else
                         {
@@ -2145,14 +2414,14 @@ namespace QuickJSON
             }
             else
             {
-                string name = converttype.Name;                              // compare by name quicker than is
-                if (name.Equals("Nullable`1"))                      // nullable types
+                string name = converttype.Name;                         // compare by name quicker than is
+                if (name.Equals("Nullable`1"))                          // nullable types
                 {
                     if (token.IsNull)
                         return null;
-                    name = converttype.GenericTypeArguments[0].Name;         // get underlying type..
+                    name = converttype.GenericTypeArguments[0].Name;    // get underlying type..
                 }
-                if (name.Equals("String"))                          // copies of QuickJSON explicit operators in QuickJSON.cs
+                if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                 {
                     if (token.IsNull)
                         return null;
@@ -2246,6 +2515,10 @@ namespace QuickJSON
                         return new ToObjectError($"JSONToObject: Unrecognised value '{token.Str()}' for enum {converttype.Name}");
                     }
                 }
+                else if (name.Equals("Object"))                     // catch all, june 7/6/23 fix
+                {
+                    return token.Value;
+                }
                 return new ToObjectError("JSONToObject: Bad Conversion " + token.TokenType + " to " + converttype.Name);
             }
         }
@@ -2271,10 +2544,18 @@ namespace QuickJSON
         {
             return ToString(this, "", "", oapad, false);
         }
-        public static string ToString(JToken token, string prepad, string postpad, string oapad, bool stringliterals)
+        public string ToString(string prepad, string postpad, string oapad, bool stringliterals, int linelength = int.MaxValue)
         {
             var sb = new System.Text.StringBuilder();
-            ToStringBuilder(sb, token, prepad, postpad, oapad, stringliterals);
+            int lastcr = 0;
+            ToStringBuilder(sb, this, prepad, postpad, oapad, stringliterals, ref lastcr, linelength);
+            return sb.ToString();
+        }
+        public static string ToString(JToken token, string prepad, string postpad, string oapad, bool stringliterals, int linelength = int.MaxValue)
+        {
+            var sb = new System.Text.StringBuilder();
+            int lastcr = 0;
+            ToStringBuilder(sb, token, prepad, postpad, oapad, stringliterals, ref lastcr, linelength);
             return sb.ToString();
         }
     }
@@ -2285,7 +2566,12 @@ namespace QuickJSON
     {
         public static void ToStringBuilder(StringBuilder str, JToken token, string prepad, string postpad, string oapad, bool stringliterals)
         {
-            if (token.TokenType == TType.String)
+            int lastcr = 0;
+            ToStringBuilder(str, token, prepad, postpad, oapad, stringliterals, ref lastcr, int.MaxValue);
+        }
+        public static void ToStringBuilder(StringBuilder str, JToken token, string prepad, string postpad, string oapad, bool stringliterals, ref int lastcr, int maxlinelength)
+        {
+                if (token.TokenType == TType.String)
             {
                 if (stringliterals)       // used if your extracting the value of the data as a string, and not turning it back to json.
                     str.Append(prepad).Append((string)token.Value).Append(postpad);
@@ -2313,20 +2599,35 @@ namespace QuickJSON
                 str.Append(prepad).Append("null").Append(postpad);
             else if (token.TokenType == TType.Array)
             {
+                if (str.Length - lastcr > maxlinelength)
+                {
+                    str.Append(System.Environment.NewLine);
+                    lastcr = str.Length;
+                }
                 str.Append(prepad).Append('[').Append(postpad);
                 string arrpad = prepad + oapad;
                 JArray ja = token as JArray;
                 for (int i = 0; i < ja.Count; i++)
                 {
                     bool notlast = i < ja.Count - 1;
-                    ToStringBuilder(str, ja[i], arrpad, postpad, oapad, stringliterals);
+                    ToStringBuilder(str, ja[i], arrpad, postpad, oapad, stringliterals, ref lastcr, maxlinelength);
                     if (notlast)
                     {
                         str.Remove(str.Length - postpad.Length, postpad.Length);    // remove the postpad
                         str.Append(',').Append(postpad);
+                        if (str.Length - lastcr > maxlinelength)        // we don't cr at the last one, as we want the ] to be next
+                        {
+                            str.Append(System.Environment.NewLine);
+                            lastcr = str.Length;
+                        }
                     }
                 }
                 str.Append(prepad).Append(']').Append(postpad);
+                if (str.Length - lastcr > maxlinelength)
+                {
+                    str.Append(System.Environment.NewLine);
+                    lastcr = str.Length;
+                }
             }
             else if (token.TokenType == TType.Object)
             {
@@ -2337,13 +2638,14 @@ namespace QuickJSON
                 foreach (var e in jo)
                 {
                     bool notlast = i++ < jo.Count - 1;
+                    string name = e.Value.ParsedName ?? e.Key;          // so if its in the object we use the ParsedName, else we use Key
                     if (e.Value is JObject || e.Value is JArray)
                     {
                         if (stringliterals)
-                            str.Append(objpad).Append(e.Key).Append(':').Append(postpad);
+                            str.Append(objpad).Append(name).Append(':').Append(postpad);
                         else
-                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(e.Key).Append("\":").Append(postpad);
-                        ToStringBuilder(str,e.Value, objpad, postpad, oapad, stringliterals);
+                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(name).Append("\":").Append(postpad);
+                        ToStringBuilder(str,e.Value, objpad, postpad, oapad, stringliterals, ref lastcr, maxlinelength);
                         if (notlast)
                         {
                             str.Remove(str.Length - postpad.Length, postpad.Length);    // remove the postpad
@@ -2353,16 +2655,26 @@ namespace QuickJSON
                     else
                     {
                         if (stringliterals)
-                            str.Append(objpad).Append(e.Key).Append(':');
+                            str.Append(objpad).Append(name).Append(':');
                         else
-                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(e.Key).Append("\":");
-                        ToStringBuilder(str, e.Value, "", "", oapad, stringliterals);
+                            str.Append(objpad).Append('"').AppendEscapeControlCharsFull(name).Append("\":");
+                        ToStringBuilder(str, e.Value, "", "", oapad, stringliterals, ref lastcr, maxlinelength);
                         if (notlast)
                             str.Append(',');
                         str.Append(postpad);
                     }
+                    if (notlast && str.Length - lastcr > maxlinelength)
+                    {
+                        str.Append(System.Environment.NewLine);
+                        lastcr = str.Length;
+                    }
                 }
                 str.Append(prepad).Append('}').Append(postpad);
+                if (str.Length - lastcr > maxlinelength)
+                {
+                    str.Append(System.Environment.NewLine);
+                    lastcr = str.Length;
+                }
             }
             else if (token.TokenType == TType.Error)
                 str.Append("ERROR:" + (string)token.Value);
@@ -2371,7 +2683,6 @@ namespace QuickJSON
         }
     }
 }
-#pragma warning disable 1591
 namespace QuickJSON.Utils
 {
     public static class Extensions
@@ -2576,11 +2887,22 @@ namespace QuickJSON.Utils
             match = match.RegExWildCardToRegular();
             return System.Text.RegularExpressions.Regex.IsMatch(value, match, caseinsensitive ? System.Text.RegularExpressions.RegexOptions.IgnoreCase : System.Text.RegularExpressions.RegexOptions.None);
         }
-        public static string NewLine(this string s)
+        public static uint Checksum(this string s)
         {
-            if (s.Length > 0 && !s.EndsWith(Environment.NewLine))
-                s += Environment.NewLine;
-            return s;
+            uint checksum = 0;
+            foreach (var ch in s)
+            {
+                checksum += 7 + (uint)ch * 23;
+            }
+            return Math.Max(1, checksum);
+        }
+        static public int? InvariantParseIntNull(this string s)     // s can be null
+        {
+            int i;
+            if (s != null && int.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out i))
+                return i;
+            else
+                return null;
         }
         public static string AlwaysQuoteString(this string obj)
         {
@@ -2597,13 +2919,17 @@ namespace QuickJSON.Utils
         string Line { get; }
         void SkipSpace();
         bool IsEOL();       // function as it can have side effects
-        char GetChar(); 
+        char GetChar();
+        char GetNextNonSpaceChar(bool skipspacesafter = true);
         char PeekChar();
         bool IsStringMoveOn(string s);
-        bool IsCharMoveOn(char t, bool skipspace = true);
+        bool IsCharMoveOn(char t, bool skipspaceafter = true);
         void BackUp();
-        int NextQuotedString(char quote, char[] buffer, bool replaceescape = false);
-        JToken JNextNumber(bool sign);
+        int NextQuotedString(char quote, char[] buffer, bool replaceescape = false, bool skipafter = true);
+        JToken JNextNumber(bool sign, bool skipafter = true);
+        JToken JNextValue(char[] buffer, bool inarray);
+        int NextCharBlock(char[] buffer, System.Func<char, bool> test, bool skipafter = true);
+        uint ChecksumCharBlock(System.Func<char, bool> test, bool skipafter = true);
     }
 }
 namespace QuickJSON.Utils
@@ -2631,11 +2957,23 @@ namespace QuickJSON.Utils
         }
         public char PeekChar()
         {
-            return (pos < line.Length) ? line[pos] : ' ';
+            return (pos < line.Length) ? line[pos] : char.MinValue;
         }
         public char GetChar()      
         {
-            return (pos < line.Length) ? line[pos++] : ' ';
+            return (pos < line.Length) ? line[pos++] : char.MinValue;
+        }
+        public char GetNextNonSpaceChar(bool skipspacesafter = true)
+        {
+            while (pos < line.Length && char.IsWhiteSpace(line[pos]))
+                pos++;
+            char ret = (pos < line.Length) ? line[pos++] : char.MinValue;
+            if ( skipspacesafter )
+            {
+                while (pos < line.Length && char.IsWhiteSpace(line[pos]))
+                    pos++;
+            }
+            return ret;
         }
         public bool IsStringMoveOn(string s)
         {
@@ -2648,12 +2986,12 @@ namespace QuickJSON.Utils
             SkipSpace();
             return true;
         }
-        public bool IsCharMoveOn(char t, bool skipspace = true)
+        public bool IsCharMoveOn(char t, bool skipspaceafter = true)
         {
             if (pos < line.Length && line[pos] == t)
             {
                 pos++;
-                if (skipspace)
+                if (skipspaceafter)
                     SkipSpace();
                 return true;
             }
@@ -2666,7 +3004,7 @@ namespace QuickJSON.Utils
         }
         #endregion
         #region WORDs bare
-        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false)
+        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false, bool skipafter = true)
         {
             int bpos = 0;
             while (true)
@@ -2678,8 +3016,11 @@ namespace QuickJSON.Utils
                 else if (line[pos] == quote)        // if reached quote, end of string
                 {
                     pos++; //skip end quote
-                    while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                        pos++;
+                    if (skipafter)
+                    {
+                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                            pos++;
+                    }
                     return bpos;
                 }
                 else if (line[pos] == '\\' && pos < line.Length - 1) // 2 chars min
@@ -2739,14 +3080,14 @@ namespace QuickJSON.Utils
         #endregion
         #region Numbers and Bools
         static char[] decchars = new char[] { '.', 'e', 'E', '+', '-' };
-        public JToken JNextNumber(bool sign)     // must be on a digit
+        public JToken JNextNumber(bool sign, bool skipafter = true)
         {
             ulong ulv = 0;
             bool bigint = false;
             int start = pos;
             while (true)
             {
-                if (pos == line.Length)         // if at end, return number got
+                if (pos == line.Length)         // if at end, return number got, no need to skip spaces
                 {
                     if (bigint)
                     {
@@ -2774,8 +3115,11 @@ namespace QuickJSON.Utils
                         while (pos < line.Length && ((line[pos] >= '0' && line[pos] <= '9') || decchars.Contains(line[pos])))
                             pos++;
                         string part = new string(line, start, pos - start);    // get double string
-                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                            pos++;
+                        if (skipafter)
+                        {
+                            while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                                pos++;
+                        }
                         if (double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double dv))
                             return new JToken(JToken.TType.Double,sign ? -dv : dv);
                         else
@@ -2785,8 +3129,11 @@ namespace QuickJSON.Utils
                     {
 #if JSONBIGINT
                         string part = new string(line, start, pos - start);    // get double string
-                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                            pos++;
+                        if (skipafter)
+                        {
+                            while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                                pos++;
+                        }
                         if (System.Numerics.BigInteger.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out System.Numerics.BigInteger bv))
                             return new JToken(JToken.TType.BigInt,sign ? -bv : bv);
                         else
@@ -2797,8 +3144,11 @@ namespace QuickJSON.Utils
                     {
                         if (pos == start)   // this means no chars, caused by a - nothing
                             return null;
-                        while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
-                            pos++;
+                        if (skipafter)
+                        {
+                            while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                                pos++;
+                        }
                         if (ulv <= long.MaxValue)
                             return new JToken(JToken.TType.Long, sign ? -(long)ulv : (long)ulv);
                         else if (sign)
@@ -2814,6 +3164,98 @@ namespace QuickJSON.Utils
                     ulv = (ulv * 10) + (ulong)(line[pos++] - '0');
                 }
             }
+        }
+        static JToken jendarray = new JToken(JToken.TType.EndArray);
+        public JToken JNextValue(char[] buffer, bool inarray)
+        {
+            char next = GetChar();
+            switch (next)
+            {
+                case '{':
+                    SkipSpace();
+                    return new JObject();
+                case '[':
+                    SkipSpace();
+                    return new JArray();
+                case '"':
+                    int textlen = NextQuotedString(next, buffer, true);
+                    return textlen >= 0 ? new JToken(JToken.TType.String, new string(buffer, 0, textlen)) : null;
+                case ']':
+                    if (inarray)
+                    {
+                        SkipSpace();
+                        return jendarray;
+                    }
+                    else
+                        return null;
+                case '0':       // all positive. JSON does not allow a + at the start (integer fraction exponent)
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                    BackUp();
+                    return JNextNumber(false);
+                case '-':
+                    return JNextNumber(true);
+                case 't':
+                    return IsStringMoveOn("rue") ? new JToken(JToken.TType.Boolean, true) : null;
+                case 'f':
+                    return IsStringMoveOn("alse") ? new JToken(JToken.TType.Boolean, false) : null;
+                case 'n':
+                    return IsStringMoveOn("ull") ? new JToken(JToken.TType.Null) : null;
+                default:
+                    return null;
+            }
+        }
+        public int NextCharBlock(char[] buffer, Func<char, bool> test, bool skipafter = true)
+        {
+            if ( pos < Line.Length)
+            {
+                int i = 0;
+                while (test(line[pos]))         // if we want it
+                {
+                    if (i >= buffer.Length)     // if we are out of buffer space error
+                        return -1;
+                    buffer[i++] = line[pos++];
+                    if (pos == Line.Length)     // if we are out of data, error
+                        return -1;
+                }
+                if ( skipafter )
+                {
+                    while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                        pos++;
+                }
+                return i;
+            }
+            return -1;
+        }
+        public uint ChecksumCharBlock(Func<char, bool> test, bool skipafter = true)
+        {
+            uint checksum = 0;
+            if (pos < Line.Length)
+            {
+                while (test(line[pos]))         // if we want it
+                {
+                    checksum += 7 + (uint)line[pos++] * 23;
+                    if (pos == Line.Length)     // if we are out of data, return checksum
+                    {
+                        return Math.Max(1, checksum);
+                    }
+                }
+                if (skipafter)
+                {
+                    while (pos < line.Length && char.IsWhiteSpace(line[pos]))   // skip spaces
+                        pos++;
+                }
+                return Math.Max(1, checksum);
+            }
+            else
+                return 0;
         }
         #endregion
         private int pos;        // always left after an operation on the next non space char
@@ -2848,6 +3290,25 @@ namespace QuickJSON.Utils
             {
                 Reload();
                 return pos < length ? line[pos++] : char.MinValue;
+            }
+        }
+        public char GetNextNonSpaceChar(bool skipspacesafter = true)
+        {
+            SkipSpace();
+            if (pos < length)
+                return line[pos++];
+            else
+            {
+                Reload();
+                if (pos < length)
+                {
+                    char ret = line[pos++];
+                    if ( skipspacesafter )
+                        SkipSpace();
+                    return ret;
+                }
+                else
+                    return char.MinValue;
             }
         }
         public char PeekChar()
@@ -2887,14 +3348,14 @@ namespace QuickJSON.Utils
             SkipSpace();
             return true;
         }
-        public bool IsCharMoveOn(char t, bool skipspace = true)
+        public bool IsCharMoveOn(char t, bool skipspaceafter = true)
         {
             if (pos == length)                          // if at end, reload
                 Reload();
             if (pos < length && line[pos] == t)
             {
                 pos++;
-                if (skipspace)
+                if (skipspaceafter)
                     SkipSpace();
                 return true;
             }
@@ -2905,7 +3366,7 @@ namespace QuickJSON.Utils
         {
             pos--;
         }
-        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false)
+        public int NextQuotedString(char quote, char[] buffer, bool replaceescape = false, bool skipafter = true)
         {
             int bpos = 0;
             while (true)
@@ -2919,7 +3380,8 @@ namespace QuickJSON.Utils
                 else if (line[pos] == quote)        // if reached quote, end of string
                 {
                     pos++; //skip end quote
-                    SkipSpace();
+                    if ( skipafter)
+                        SkipSpace();
                     return bpos;
                 }
                 else if (line[pos] == '\\' ) // 2 chars min
@@ -2985,7 +3447,7 @@ namespace QuickJSON.Utils
             }
         }
         static char[] decchars = new char[] { '.', 'e', 'E', '+', '-' };
-        public JToken JNextNumber(bool sign)     // must be on a digit
+        public JToken JNextNumber(bool sign, bool skipafter = true)     
         {
             ulong ulv = 0;
             bool bigint = false;
@@ -2993,7 +3455,7 @@ namespace QuickJSON.Utils
             bool slid = false;
             while (true)
             {
-                if (pos == line.Length)
+                if (pos == line.Length)     // if at end of loaded text
                 {
                     System.Diagnostics.Debug.Assert(slid == false);         // must not slide more than once
                     Reload(start);              // get more data, keeping d  back to start
@@ -3006,7 +3468,8 @@ namespace QuickJSON.Utils
                     {
 #if JSONBIGINT
                         string part = new string(line, start, pos - start);    // get double string
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
                         if (System.Numerics.BigInteger.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out System.Numerics.BigInteger bv))
                             return new JToken(JToken.TType.BigInt, sign ? -bv : bv);
                         else
@@ -3041,7 +3504,8 @@ namespace QuickJSON.Utils
                                 break;
                         }
                         string part = new string(line, start, pos - start);    // get double string
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
                         if (double.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double dv))
                             return new JToken(JToken.TType.Double, sign ? -dv : dv);
                         else
@@ -3051,7 +3515,8 @@ namespace QuickJSON.Utils
                     {
 #if JSONBIGINT
                         string part = new string(line, start, pos - start);    // get double string
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
                         if (System.Numerics.BigInteger.TryParse(part, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out System.Numerics.BigInteger bv))
                             return new JToken(JToken.TType.BigInt, sign ? -bv : bv);
                         else
@@ -3062,7 +3527,8 @@ namespace QuickJSON.Utils
                     {
                         if (pos == start)   // this means no chars, caused by a - nothing
                             return null;
-                        SkipSpace();
+                        if (skipafter)
+                            SkipSpace();
                         if (ulv <= long.MaxValue)
                             return new JToken(JToken.TType.Long, sign ? -(long)ulv : (long)ulv);
                         else if (sign)
@@ -3076,6 +3542,99 @@ namespace QuickJSON.Utils
                     if (ulv > ulong.MaxValue / 10)  // if going to overflow, bit int. collect all ints
                         bigint = true;
                     ulv = (ulv * 10) + (ulong)(line[pos++] - '0');
+                }
+            }
+        }
+        static JToken jendarray = new JToken(JToken.TType.EndArray);
+        public JToken JNextValue(char[] buffer, bool inarray)
+        {
+            char next = GetChar();
+            switch (next)
+            {
+                case '{':
+                    SkipSpace();
+                    return new JObject();
+                case '[':
+                    SkipSpace();
+                    return new JArray();
+                case '"':
+                    int textlen = NextQuotedString(next, buffer, true);
+                    return textlen >= 0 ? new JToken(JToken.TType.String, new string(buffer, 0, textlen)) : null;
+                case ']':
+                    if (inarray)
+                    {
+                        SkipSpace();
+                        return jendarray;
+                    }
+                    else
+                        return null;
+                case '0':       // all positive. JSON does not allow a + at the start (integer fraction exponent)
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                    BackUp();
+                    return JNextNumber(false);
+                case '-':
+                    return JNextNumber(true);
+                case 't':
+                    return IsStringMoveOn("rue") ? new JToken(JToken.TType.Boolean, true) : null;
+                case 'f':
+                    return IsStringMoveOn("alse") ? new JToken(JToken.TType.Boolean, false) : null;
+                case 'n':
+                    return IsStringMoveOn("ull") ? new JToken(JToken.TType.Null) : null;
+                default:
+                    return null;
+            }
+        }
+        public int NextCharBlock(char[] buffer, Func<char, bool> test, bool skipafter = true)
+        {
+            int bpos = 0;
+            while (true)
+            {
+                if (pos == line.Length)     // if out of chars, reload
+                    Reload();
+                if (pos == line.Length || bpos == buffer.Length)  // if reached end of line, or out of buffer, error
+                {
+                    return -1;
+                }
+                if (test(line[pos]))        // if ok, store
+                {
+                    buffer[bpos++] = line[pos++];
+                }
+                else
+                {
+                    if (skipafter)
+                        SkipSpace();
+                    return bpos;
+                }
+            }
+        }
+        public uint ChecksumCharBlock(Func<char, bool> test, bool skipafter = true)
+        {
+            uint checksum = 0;
+            while (true)
+            {
+                if (pos == line.Length)     // if out of chars, reload
+                    Reload();
+                if (pos == line.Length)  // if reached end of line, checksum
+                {
+                    return Math.Max(1, checksum);
+                }
+                if (test(line[pos]))        // if ok, store
+                {
+                    checksum += 7 + (uint)line[pos++] * 23;
+                }
+                else
+                {
+                    if (skipafter)
+                        SkipSpace();
+                    return Math.Max(1, checksum);
                 }
             }
         }

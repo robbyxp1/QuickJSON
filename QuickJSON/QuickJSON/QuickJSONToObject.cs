@@ -19,15 +19,16 @@ using static QuickJSON.JToken;
 namespace QuickJSON
 {
     /// <summary>
-    /// Class with extensions for JToken
+    /// Class which extends QuickJSON with the ability to create c# objects from JTokens
     /// </summary>
     public static class JTokenExtensions
     {
-        /// <summary> Convert the JToken tree to an object of type T </summary>
+        /// <summary> Convert the JToken tree to an object of type T. 
+        /// Type errors are not ignored, custom attributes are not checked (increasing speed)</summary>
         /// <typeparam name="T">Convert to this type</typeparam>
         /// <param name="token">JToken to convert from</param>
         /// <returns>New object T containing fields filled by JToken, or default(T) on error</returns>
-        public static T ToObjectQ<T>(this JToken token)            // quick version, with checkcustomattr off
+        public static T ToObjectQ<T>(this JToken token)          
         {
             return ToObject<T>(token, false, false);
         }
@@ -37,7 +38,7 @@ namespace QuickJSON
         /// <param name="token">JToken to convert from</param>
         /// <param name="ignoretypeerrors">Ignore any errors in type between the JToken type and the member type.</param>
         /// <param name="checkcustomattr">Check custom attribute JsonNameAttribute and JsonIgnoreAttribute.  Setting this false improved performance</param>
-        /// <returns>New object T containing fields filled by JToken, or default(T) (null) on error. </returns>
+        /// <returns>New object T containing fields filled by JToken, or default(T) on error. </returns>
         public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, bool checkcustomattr = true) 
         {
             Type tt = typeof(T);

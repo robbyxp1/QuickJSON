@@ -35,7 +35,15 @@ namespace QuickJSON
         }
 
         /// <summary> Return a string looking for this list of property names. Return def if not found or not string </summary>
-        public static string MultiStr(this JObject token, string[] propertynameslist, string def = "")       // multiple lookup in Object of names
+        public static string MultiStr(this JObject token, string[] propertynameslist, string def = "")  
+        {
+            JToken t = token?.Contains(propertynameslist);
+            return t != null && t.IsString ? (string)t.Value : def;
+        }
+
+        /// <summary> Return a string looking for this list of property names. Return def if not found or not string 
+        /// This one you must supply def but you can use the params array syntax with </summary>
+        public static string MultiStr(this JObject token, string def, params string[] propertynameslist)
         {
             JToken t = token?.Contains(propertynameslist);
             return t != null && t.IsString ? (string)t.Value : def;

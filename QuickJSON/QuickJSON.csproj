@@ -21,8 +21,16 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>1.5
-
+    <PackageReleaseNotes>2.0
+Add JSONSchema - implements most of 2022-12 schema
+Add JSONFormatter.ToFluent - convert an object to fluent syntax.  Fluent is great for streaming large amounts of JSON to a file. Add a Fluent Streamer class.
+Token: Add ValueEquals. Improve IgnoreAttribute. Add GetTokenSchemaPath and GetToken by path.
+Token: Add Level to JToken when parsed. Support multiple repeated names in objects when parsed - introduced OriginalName (from file) and ParsedName
+Token: Add TryGet* to JToken object extentions.
+Object: Object.Contains functions added. Add Object.Rename. Add Object.Merge
+Arrays: Add Array.IndexOf(Token).
+String output: Add line wrap to ToString.
+Fix LoadTokens error in array.
 1.4
 JsonIgnoreAttribute added Ignore and IncludeOnly options so that you can pick members of a class or exclude specific ones
 1.3
@@ -43,11 +51,11 @@ DoubleNull and FloatNull added</PackageReleaseNotes>
 Designed for speed and compactness.
 Code can be XCOPYED into your project to avoid DLL dependencies.
 </Description>
-    <Copyright>(C) robbyxp @ gihub.com  2023</Copyright>
+    <Copyright>(C) robbyxp @ gihub.com  2020-2024</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.4</Version>
-    <AssemblyVersion>1.5.0.0</AssemblyVersion>
-    <FileVersion>1.5.0.0</FileVersion>
+    <Version>2.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net5.0|AnyCPU'">
