@@ -134,6 +134,7 @@ namespace QuickJSON
 
         /// <summary> Parse JSON text and produce a JToken tree. This is the lowest level parser allowing a buffer to be fed into it 
         /// Note any empty name properties will be names !!!EmptyNameN!!! to make them unique and searchable
+        /// Note any repeat name properties will be names !!!Repeat-Name[repeatnumber] make them unique and searchable
         /// </summary>
         /// <param name="parser">A string parser based on IStringParserQuick</param>
         /// <param name="error">Null on success, or error text</param>
@@ -287,7 +288,7 @@ namespace QuickJSON
                                                 total++;    // if we have a repeat increase count
                                         }
 
-                                        o.Name = originalname + $"[{total.ToStringInvariant()}]";
+                                        o.Name = $"!!!Repeat-{originalname}[{total.ToStringInvariant()}]!!!";
                                         o.OriginalName = originalname;
                                     }
                                     else
@@ -437,7 +438,6 @@ namespace QuickJSON
 
             }
         }
-
 
         static private string GenErrorString(IStringParserQuick parser, string text)
         {

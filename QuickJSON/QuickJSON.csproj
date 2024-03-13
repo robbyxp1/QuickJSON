@@ -14,14 +14,16 @@
     <DefaultDocumentationGeneratedAccessModifiers>Public,Protected</DefaultDocumentationGeneratedAccessModifiers>
     <DefaultDocumentationNestedTypeVisibilities>DeclaringType</DefaultDocumentationNestedTypeVisibilities>
     <PackageId>RJKJSoft.QuickJSON</PackageId>
-    <Authors>robbyxp @ gihub.com</Authors>
+    <Authors>robbyxp @ github.com</Authors>
     <PackageProjectUrl>https://github.com/robbyxp1/QuickJSON</PackageProjectUrl>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>readme.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>2.0
+    <PackageReleaseNotes>2.0.1
+Fixed ToString so that assigning an existing JToken to a new key, the new key name is printed, not the parsed name.  Changed synthetic key names for repeat and emptyname to make them more recognisable
+2.0
 Add JSONSchema - implements most of 2022-12 schema
 Add JSONFormatter.ToFluent - convert an object to fluent syntax.  Fluent is great for streaming large amounts of JSON to a file. Add a Fluent Streamer class.
 Token: Add ValueEquals. Improve IgnoreAttribute. Add GetTokenSchemaPath and GetToken by path.
@@ -47,15 +49,16 @@ Made ToString() work so much faster by using StringBuilder!
 0.95
 Fix issue with DateTimeUTC so it returns a mindate with UTC kind if it fails to convert
 DoubleNull and FloatNull added</PackageReleaseNotes>
-    <Description>A quick and simple JSON encoder and decoder for .net.
+    <Description>A quick JSON encoder and decoder for .net.
 Designed for speed and compactness.
 Code can be XCOPYED into your project to avoid DLL dependencies.
 </Description>
-    <Copyright>(C) robbyxp @ gihub.com  2020-2024</Copyright>
+    <Copyright>(C) robbyxp @ github.com  2020-2024</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
+    <Version>2.0.1</Version>
+    <AssemblyVersion>2.0.1.0</AssemblyVersion>
+    <FileVersion>2.0.1.0</FileVersion>
+    <Company>robbyxp @ github.com</Company>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net5.0|AnyCPU'">

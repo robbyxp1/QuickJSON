@@ -77,6 +77,9 @@ namespace QuickJSON
         /// <summary> The parsed name, either Name or OriginalName (if the property name was empty or a repeat), set on Parse or ParseToken only</summary>
         public string ParsedName { get { return OriginalName ?? Name; } }
 
+        /// <summary> If the parsed name is empty or a repeat, it will be given a synthetic name. </summary>
+        static public bool IsKeyNameSynthetic(string name) { return (name.StartsWith("!!!EmptyName") && name.EndsWith("!!!")) || (name.StartsWith("!!!Repeat-") && name.EndsWith("]!!!")); }
+
         /// <summary> Heirachy level, 0 onwards. Set in Parse and ParseToken only</summary>
         public int Level { get; set; }
 
