@@ -464,6 +464,17 @@ namespace QuickJSON
             else
                 return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
         }
+        /// <summary> Return a DateTime presuming UTC with the parse of the string JToken. </summary>
+        /// <param name="token">Token to convert. Must be a string. May be null.</param>
+        /// <param name="def">Default time if conversion fails. Converted to UTC</param>
+        /// <returns>DateTime with Kind=UTC, or def (with Kind=UTC) if conversion fails</returns>
+        public static DateTime DateTimeUTC(this JToken token, DateTime def)
+        {
+            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
+                return ret;
+            else
+                return def.ToUniversalTime();
+        }
 
         /// <summary>Convert a string token to an enumeration of type T.  Return def if conversion fails </summary>
         /// <typeparam name="T">Enumeration type to convert</typeparam>

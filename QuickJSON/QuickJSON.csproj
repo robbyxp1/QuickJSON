@@ -21,7 +21,16 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>2.0.1
+    <PackageReleaseNotes>2.1
+Can Add/AddRange to a JArray via a JToken now, and add to a JObject via JToken
+Can Extract more lists of values from JArray (DateTime/Bool/Float)
+Add new DateTimeUTC extractor
+Add TraceOutput switch which will report to the trace system if a enum value does not convert - for catching errors which are masked by ignoretypeerrors
+ToObject preprocessor improved with more accessors supporting the option
+
+2.0.2
+Add to ToObject preprocess allowing manipulation of DateTime/Enums before parsing in case they are decorated
+2.0.1
 Fixed ToString so that assigning an existing JToken to a new key, the new key name is printed, not the parsed name.  Changed synthetic key names for repeat and emptyname to make them more recognisable
 2.0
 Add JSONSchema - implements most of 2022-12 schema
@@ -55,9 +64,9 @@ Code can be XCOPYED into your project to avoid DLL dependencies.
 </Description>
     <Copyright>(C) robbyxp @ github.com  2020-2024</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.0.1</Version>
-    <AssemblyVersion>2.0.1.0</AssemblyVersion>
-    <FileVersion>2.0.1.0</FileVersion>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <FileVersion>2.1.0.0</FileVersion>
     <Company>robbyxp @ github.com</Company>
   </PropertyGroup>
 

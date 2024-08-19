@@ -501,7 +501,9 @@ namespace QuickJSON
                 throw new InvalidOperationException();
         }
 
-        /// <summary> Explicit conversion of a JSON Token Boolean or Long to a bool. Return null if JToken is not of the right type</summary>
+        /// <summary> Explicit conversion of a JSON Token Boolean or Long to a bool. 
+        /// Both true/false and integers (0=false, otherwise true) are acceptable
+        /// Return null if JToken is not of the right type</summary>
         public static explicit operator bool? (JToken tk)
         {
             if (tk.TokenType == TType.Boolean)
@@ -724,6 +726,36 @@ namespace QuickJSON
         /// </exception>
         public virtual JToken this[object key] { get { return null; } set { throw new NotImplementedException(); } }
 
+        /// <summary> Add to a JArray a JToken thru this class</summary>
+        /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
+        /// </exception>
+        public virtual void Add(JToken value) { throw new NotImplementedException(); }
+
+        /// <summary> Add to a JArray a value of type T thru this class. T must be convertable to a JToken - see JToken Implicit conversions</summary>
+        /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
+        /// </exception>
+        public virtual void Add<T>(T value) { throw new NotImplementedException(); }
+
+        /// <summary> Add a range of JTokens to a JArray thru this class.</summary>
+        /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
+        /// </exception>
+        public virtual void AddRange(IEnumerable<JToken> o) { throw new NotImplementedException(); }
+
+        /// <summary> Add a range of items of type T to a JArray thru this class. T must be convertable to a JToken - see JToken Implicit conversions</summary>
+        /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
+        /// </exception>
+        public virtual void AddRange<T>(IEnumerable<T> values) { throw new NotImplementedException(); }
+
+        /// <summary> Add a JToken with this property name thru this class.  Will overwrite any existing property</summary>
+        /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
+        /// </exception>
+        public virtual void Add(string key, JToken value) { throw new NotImplementedException(); }
+
+        /// <summary> Add value of type T with this property name.  Will overwrite any existing property. T must be convertable to a JToken - see JToken Implicit conversions </summary>
+        /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
+        /// </exception>
+        public virtual void Add<T>(string key, T value) { throw new NotImplementedException(); }
+
         /// <summary> Get the first JToken </summary>
         /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
         /// </exception>
@@ -773,8 +805,14 @@ namespace QuickJSON
         /// <summary> Clear JArray or JObject of items</summary>
         /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
         /// </exception>
-        public virtual void Clear() { throw new NotImplementedException(); }    // clear all children
+        public virtual void Clear() { throw new NotImplementedException(); }
 
+        #endregion
+
+        #region Debug Output Switch
+
+        /// <summary> Set to enable trace output on failures which are ordered to be masked during operation</summary>
+        public static bool TraceOutput { get; set; } = false;          
         #endregion
 
     }

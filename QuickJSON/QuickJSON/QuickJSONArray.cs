@@ -102,9 +102,13 @@ namespace QuickJSON
         public int IndexOf(JToken tk) { return Elements.IndexOf(tk); }
 
         /// <summary> Add a JToken to the end of the array </summary>
-        public void Add(JToken o) {Elements.Add(o); }
+        public override void Add(JToken o) { Elements.Add(o); }
+        /// <summary> Add type T to the end of the array. T must be convertable to a JToken - see JToken Implicit conversions</summary>
+        public override void Add<T>(T value) { dynamic x = value; Elements.Add((JToken)x); }
         /// <summary> Add a range of JTokens to the end of the array</summary>
-        public void AddRange(IEnumerable<JToken> o) { Elements.AddRange(o); }
+        public override void AddRange(IEnumerable<JToken> o) { Elements.AddRange(o); }
+        /// <summary> Add a range of items of type T to the end of the array. T must be convertable to a JToken - see JToken Implicit conversions</summary>
+        public override void AddRange<T>(IEnumerable<T> values) { foreach( dynamic x in values) Elements.Add((JToken)x); }
 
         /// <summary> Remove JToken at index</summary>
         /// <exception cref="System.ArgumentOutOfRangeException">If index is out of range
@@ -133,6 +137,12 @@ namespace QuickJSON
         /// Any non strings are inserted into the list as null
         /// </summary>
         public List<string> String() { return Elements.ConvertAll<string>((o) => { return o.TokenType == TType.String ? ((string)o.Value) : null; }); }
+        /// <summary> Convert the JTokens in the array to bool and return a list of bools.
+        /// Both true/false bool array and integer arrays (0=false, otherwise true) are acceptable
+        /// </summary>
+        /// <exception cref="System.InvalidCastException">If any items are not numbers or true or false
+        /// </exception> 
+        public List<bool> Bool() { return Elements.ConvertAll<bool>((o) => { return (bool)o.Value; }); }
         /// <summary> Convert the JTokens in the array to int and return a list of ints. Truncation of value may occur.</summary>
         /// <exception cref="System.InvalidCastException">If any items are not numbers
         /// </exception> 
@@ -141,10 +151,18 @@ namespace QuickJSON
         /// <exception cref="System.InvalidCastException">If any items are not numbers
         /// </exception> 
         public List<long> Long() { return Elements.ConvertAll<long>((o) => { return ((long)o.Value); }); }
+        /// <summary> Convert the JTokens in the array to floats and return a list of floats.</summary>
+        /// <exception cref="System.InvalidCastException">If any items are not numbers
+        /// </exception> 
+        public List<float> Float() { return Elements.ConvertAll<float>((o) => { return ((float)o.Value); }); }
         /// <summary> Convert the JTokens in the array to doubles and return a list of doubles.</summary>
         /// <exception cref="System.InvalidCastException">If any items are not numbers
         /// </exception> 
         public List<double> Double() { return Elements.ConvertAll<double>((o) => { return ((double)o.Value); }); }
+        /// <summary> Convert the JTokens in the array to DateTime and return a list of DateTimes.</summary>
+        /// <exception cref="System.InvalidCastException">If any items are not DateTimes
+        /// </exception> 
+        public List<DateTime> DateTime() { return Elements.ConvertAll<DateTime>((o) => { return ((DateTime)o); }); }
 
         /// <summary> Parse the JSON string presuming it will return an JArray</summary>
         /// <param name="text">Text to parse</param>

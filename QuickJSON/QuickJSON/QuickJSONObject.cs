@@ -151,7 +151,10 @@ namespace QuickJSON
         public override int Count { get { return Objects.Count; } }
 
         /// <summary> Add a JToken with this property name.  Will overwrite any existing property</summary>
-        public void Add(string key, JToken value) { this[key] = value; }
+        public override void Add(string key, JToken value) { this[key] = value; }
+
+        /// <summary> Add a JToken with this property name.  Will overwrite any existing property</summary>
+        public override void Add<T>(string key, T o) { dynamic x = o; this[key] = (JToken)x; }
 
         /// <summary>
         /// Merge two objects together, with overwrite protection

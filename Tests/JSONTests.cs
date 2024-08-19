@@ -50,6 +50,11 @@ namespace JSONTests
                 Check.That(decoded1).IsNotNull();
                 Check.That(decoded1.ToString()).Equals("{}");
 
+                string json234 = "  [ 2,3,4 ] ";
+                JToken decoded1a = JToken.Parse(json234);
+                Check.That(decoded1a).IsNotNull();
+                Check.That(decoded1a.ToString()).Equals("[2,3,4]");
+
                 string jsonemptyarray = "  [   ] ";
                 JToken decoded2 = JToken.Parse(jsonemptyarray);
                 Check.That(decoded2).IsNotNull();
@@ -95,9 +100,37 @@ namespace JSONTests
                 // string j = jo["timest\"am\tp"].Str();
                 //  Check.That(j).Equals("2020-06-29T09:53:54Z");
 
+                // new in aug 24 - direct adds thru JToken
+                JToken jo2 = new JObject();
+                jo2.Add("Now", DateTime.UtcNow);       // use implicit conversion
+                jo2.Add("ten", 10.23);
+
+                JToken jo2t = jo2;      
+                jo2t.Add("Twenty", 20);                 // go thru jtoken for new (aug 24) syntax sugar
+                Check.That(jo2.Count).Equals(3);
+
+                DateTime[] starts = new DateTime[] { new DateTime(2015, 1, 1), new DateTime(2020, 1, 2) };  // use newer enumerator adds of basic type
+                JArray j0 = new JArray();
+                j0.AddRange(starts);
+                var now = DateTime.UtcNow;
+                j0.Add(now);
+                Check.That(j0.Count).Equals(3);
+
+                List<DateTime> extractdatetimes = j0.DateTime();
+                Check.That(extractdatetimes.Count).Equals(3);
+                Check.That(extractdatetimes[0]).Equals(starts[0]);
+                Check.That(extractdatetimes[1]).Equals(starts[1]);      // can't check 2 because precision of passing it thru JSON means ticks are not exactly the same as UtcNow
+
+
+
                 JArray ja = new JArray(20.2, 30.3, 40.4);
                 Check.That(ja).IsNotNull();
                 Check.That(ja.Count).Equals(3);
+
+                JToken jat = ja;
+                jat.AddRange(new double[] { 50, 60, 70 });       // test aug 24 add range via token
+                Check.That(ja.Count).Equals(6);
+
 
                 JArray jb = new JArray("hello", "jim", "sheila");
                 Check.That(jb).IsNotNull();

@@ -535,6 +535,19 @@ namespace JSONTests
 
             }
 
+            {
+                string matlist = @"{ ""Raw"":{ ""t1"":""$three;"" } }";
+                JToken matlistj = JToken.Parse(matlist);
+                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, false, preprocess:(type,text)=> {
+                    if (type == typeof(TestEnum))
+                        return text.Substring(1, text.Length - 2);
+                    else
+                        return "CRAP";
+                });
+                Check.That(((FromObjectTest)Raw).t1).Equals(TestEnum.three);
+
+            }
+
         }
 
     }

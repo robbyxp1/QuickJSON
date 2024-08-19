@@ -32,6 +32,7 @@ namespace QuickJSON
         public string Name { get; set; }
         public string OriginalName { get; set; }
         public string ParsedName { get { return OriginalName ?? Name; } }
+        static public bool IsKeyNameSynthetic(string name) { return (name.StartsWith("!!!EmptyName") && name.EndsWith("!!!")) || (name.StartsWith("!!!Repeat-") && name.EndsWith("]!!!")); }
         public int Level { get; set; }
         public bool IsProperty { get { return Name != null; } }      
         public bool HasValue { get { return Value != null;  } }
@@ -522,6 +523,12 @@ namespace QuickJSON
         #endregion
         #region Operators and functions
         public virtual JToken this[object key] { get { return null; } set { throw new NotImplementedException(); } }
+        public virtual void Add(JToken value) { throw new NotImplementedException(); }
+        public virtual void Add<T>(T value) { throw new NotImplementedException(); }
+        public virtual void AddRange(IEnumerable<JToken> o) { throw new NotImplementedException(); }
+        public virtual void AddRange<T>(IEnumerable<T> values) { throw new NotImplementedException(); }
+        public virtual void Add(string key, JToken value) { throw new NotImplementedException(); }
+        public virtual void Add<T>(string key, T value) { throw new NotImplementedException(); }
         public virtual JToken First() { throw new NotImplementedException(); }
         public virtual JToken Last() { throw new NotImplementedException(); }
         public virtual JToken FirstOrDefault() { throw new NotImplementedException(); }
@@ -537,7 +544,10 @@ namespace QuickJSON
         }
         internal virtual IEnumerator GetSubClassEnumerator() { throw new NotImplementedException(); }
         public virtual int Count { get { return 0; } }
-        public virtual void Clear() { throw new NotImplementedException(); }    // clear all children
+        public virtual void Clear() { throw new NotImplementedException(); }
+        #endregion
+        #region Debug Output Switch
+        public static bool TraceOutput { get; set; } = false;          
         #endregion
     }
 }
@@ -577,17 +587,22 @@ namespace QuickJSON
         public bool TryGetValue(int index, out JToken token) { if (index >= 0 && index < Elements.Count) { token = Elements[index]; return true; } else { token = null; return false; } }
         public override int Count { get { return Elements.Count; } }
         public int IndexOf(JToken tk) { return Elements.IndexOf(tk); }
-        public void Add(JToken o) {Elements.Add(o); }
-        public void AddRange(IEnumerable<JToken> o) { Elements.AddRange(o); }
+        public override void Add(JToken o) { Elements.Add(o); }
+        public override void Add<T>(T value) { dynamic x = value; Elements.Add((JToken)x); }
+        public override void AddRange(IEnumerable<JToken> o) { Elements.AddRange(o); }
+        public override void AddRange<T>(IEnumerable<T> values) { foreach( dynamic x in values) Elements.Add((JToken)x); }
         public void RemoveAt(int index) { Elements.RemoveAt(index); }
         public void RemoveRange(int index,int count) { Elements.RemoveRange(index,count); }
         public override void Clear() { Elements.Clear(); }
         public JToken Find(System.Predicate<JToken> predicate) { return Elements.Find(predicate); }
         public T Find<T>(System.Predicate<JToken> predicate) { Object r = Elements.Find(predicate); return (T)r; }
         public List<string> String() { return Elements.ConvertAll<string>((o) => { return o.TokenType == TType.String ? ((string)o.Value) : null; }); }
+        public List<bool> Bool() { return Elements.ConvertAll<bool>((o) => { return (bool)o.Value; }); }
         public List<int> Int() { return Elements.ConvertAll<int>((o) => { return (int)((long)o.Value); }); }
         public List<long> Long() { return Elements.ConvertAll<long>((o) => { return ((long)o.Value); }); }
+        public List<float> Float() { return Elements.ConvertAll<float>((o) => { return ((float)o.Value); }); }
         public List<double> Double() { return Elements.ConvertAll<double>((o) => { return ((double)o.Value); }); }
+        public List<DateTime> DateTime() { return Elements.ConvertAll<DateTime>((o) => { return ((DateTime)o); }); }
         public new static JArray Parse(string text, ParseOptions flags = ParseOptions.None)
         {
             var res = JToken.Parse(text,flags);
@@ -1010,7 +1025,8 @@ namespace QuickJSON
         }
         
         public override int Count { get { return Objects.Count; } }
-        public void Add(string key, JToken value) { this[key] = value; }
+        public override void Add(string key, JToken value) { this[key] = value; }
+        public override void Add<T>(string key, T o) { dynamic x = o; this[key] = (JToken)x; }
         public void Merge(JObject other, bool allowoverwrite = true)
         {
             foreach (var kvp in other.Objects)
@@ -1310,7 +1326,7 @@ namespace QuickJSON
                                             if (kvp.Key == originalname || (kvp.Key.StartsWith(originalname + "[") && kvp.Key.EndsWith("]")))        
                                                 total++;    // if we have a repeat increase count
                                         }
-                                        o.Name = originalname + $"[{total.ToStringInvariant()}]";
+                                        o.Name = $"!!!Repeat-{originalname}[{total.ToStringInvariant()}]!!!";
                                         o.OriginalName = originalname;
                                     }
                                     else
@@ -1783,6 +1799,13 @@ namespace QuickJSON
             else
                 return new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Utc);        //Minvalue in utc mode
         }
+        public static DateTime DateTimeUTC(this JToken token, DateTime def)
+        {
+            if (token != null && token.IsString && System.DateTime.TryParse((string)token.Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
+                return ret;
+            else
+                return def.ToUniversalTime();
+        }
         public static T Enumeration<T>(this JToken token, T def, Func<string, string> preprocess = null)
         {
             if (token != null && token.IsString)
@@ -2153,12 +2176,16 @@ namespace QuickJSON
         {
             return ToObject<T>(token, false, false);
         }
-        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, bool checkcustomattr = true) 
+        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, bool checkcustomattr = true)
+        {
+            return ToObject<T>(token, ignoretypeerrors, checkcustomattr, null);
+        }
+        public static T ToObject<T>(this JToken token, bool ignoretypeerrors, bool checkcustomattr, Func<Type, string, string> preprocess)
         {
             Type tt = typeof(T);
             try
             {
-                Object ret = token.ToObject(tt, ignoretypeerrors, checkcustomattr);        // paranoia, since there are a lot of dynamics, trap any exceptions
+                Object ret = token.ToObject(tt, ignoretypeerrors, checkcustomattr,preprocess:preprocess);        // paranoia, since there are a lot of dynamics, trap any exceptions
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -2175,11 +2202,12 @@ namespace QuickJSON
         }
         public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors, bool checkcustomattr,
                                     System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-                                    Object initialobject = null)
+                                    Object initialobject = null,
+                                    Func<Type, string, string> preprocess = null)
         {
             try
             {
-                return ToObject(token, converttype, ignoretypeerrors, checkcustomattr, membersearchflags, initialobject);
+                return ToObject(token, converttype, ignoretypeerrors, checkcustomattr, membersearchflags, initialobject, preprocess);
             }
             catch (Exception ex)
             {
@@ -2188,15 +2216,10 @@ namespace QuickJSON
             return null;
        
         }
-        public class ToObjectError
-        {
-            public string ErrorString;
-            public string PropertyName;
-            public ToObjectError(string s) { ErrorString = s; PropertyName = ""; }
-        };
         public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors, bool checkcustomattr,
                 System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-                Object initialobject = null)
+                Object initialobject = null,
+                Func<Type, string, string> preprocess = null)
         {
             if (token == null)
             {
@@ -2212,7 +2235,7 @@ namespace QuickJSON
                         dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, token.Count);   // dynamic holder for instance of array[]
                         for (int i = 0; i < token.Count; i++)
                         {
-                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, checkcustomattr);      // get the underlying element, must match array element type
+                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, checkcustomattr, preprocess: preprocess);
                             if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
                             {
                                 ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
@@ -2232,7 +2255,7 @@ namespace QuickJSON
                         var types = converttype.GetGenericArguments();
                         for (int i = 0; i < token.Count; i++)
                         {
-                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, checkcustomattr);      // get the underlying element, must match types[0] which is list type
+                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, checkcustomattr, preprocess: preprocess);
                             if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
                             {
                                 ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
@@ -2251,7 +2274,7 @@ namespace QuickJSON
                 }
                 catch (Exception ex)
                 {
-                    return new ToObjectError($"JSONToObject: Create Error {converttype.Name} {ex.Message}");       
+                    return new ToObjectError($"JSONToObject: Create Error {converttype.Name} {ex.Message}");
                 }
             }
             else if (token.TokenType == JToken.TType.Object)                   // objects are best efforts.. fills in as many fields as possible
@@ -2262,7 +2285,7 @@ namespace QuickJSON
                     var types = converttype.GetGenericArguments();
                     foreach (var kvp in (JObject)token)
                     {
-                        Object ret = ToObject(kvp.Value, types[1], ignoretypeerrors, checkcustomattr);        // get the value as the dictionary type - it must match type or it get OE
+                        Object ret = ToObject(kvp.Value, types[1], ignoretypeerrors, checkcustomattr, preprocess: preprocess);
                         if (ret != null && ret.GetType() == typeof(ToObjectError))
                         {
                             ((ToObjectError)ret).PropertyName = converttype.Name + "." + kvp.Key + "." + ((ToObjectError)ret).PropertyName;
@@ -2324,7 +2347,7 @@ namespace QuickJSON
                                 }
                             }
                         }
-                        if ( mi == null )
+                        if (mi == null)
                         {
                             if (pi == null)     // lazy load pick up, only load these if fields not found
                             {
@@ -2335,7 +2358,7 @@ namespace QuickJSON
                                     for (int i = 0; i < pi.Length; i++)
                                     {
                                         var attrlist = pi[i].GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                        if ( attrlist.Length == 1 )
+                                        if (attrlist.Length == 1)
                                             pinames[i] = ((dynamic)attrlist[0]).Names;
                                         else
                                             pinames[i] = new string[] { pi[i].Name };
@@ -2369,13 +2392,14 @@ namespace QuickJSON
                                 Type otype = mi.FieldPropertyType();
                                 if (otype != null)                          // and its a field or property
                                 {
-                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, checkcustomattr);    // get the value - must match otype.. ret may be zero for ? types
+                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, checkcustomattr, preprocess: preprocess);
                                     if (ret != null && ret.GetType() == typeof(ToObjectError))
                                     {
                                         ((ToObjectError)ret).PropertyName = converttype.Name + "." + kvp.Key + "." + ((ToObjectError)ret).PropertyName;
                                         if (ignoretypeerrors)
                                         {
-                                            System.Diagnostics.Debug.WriteLine("Ignoring Object error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
+                                            if (JToken.TraceOutput)
+                                                System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Ignoring Object error: {((ToObjectError)ret).ErrorString} : {((ToObjectError)ret).PropertyName}");
                                         }
                                         else
                                         {
@@ -2388,7 +2412,8 @@ namespace QuickJSON
                                         {
                                             if (ignoretypeerrors)
                                             {
-                                                System.Diagnostics.Debug.WriteLine("Ignoring cannot set value on property " + mi.Name);
+                                                if (JToken.TraceOutput)
+                                                    System.Diagnostics.Trace.WriteLine("QuickJSON ToObject Ignoring cannot set value on property " + mi.Name);
                                             }
                                             else
                                             {
@@ -2412,14 +2437,37 @@ namespace QuickJSON
                 else
                     return new ToObjectError($"JSONToObject: Not class {converttype.Name}");
             }
-            else
+            else if (converttype.IsEnum)
             {
+                if (!token.IsString)
+                {
+                    if (TraceOutput)
+                        System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Enum Token is not string for {converttype.Name}");
+                    return new ToObjectError($"JSONToObject: Enum Token is not string for {converttype.Name}");
+                }
+                try
+                {
+                    string valuetext = token.Str();
+                    if (preprocess != null)
+                        valuetext = preprocess(converttype, valuetext);
+                    Object p = Enum.Parse(converttype, valuetext, true);
+                    return Convert.ChangeType(p, converttype);
+                }
+                catch
+                {
+                    if (TraceOutput)
+                        System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Unrecognised value '{token.Str()}' for enum {converttype.Name}");
+                    return new ToObjectError($"JSONToObject: Unrecognised value '{token.Str()}' for enum {converttype.Name}");
+                }
+            }
+            else
+            { 
                 string name = converttype.Name;                         // compare by name quicker than is
                 if (name.Equals("Nullable`1"))                          // nullable types
                 {
                     if (token.IsNull)
                         return null;
-                    name = converttype.GenericTypeArguments[0].Name;    // get underlying type..
+                    name = converttype.GenericTypeArguments[0].Name;    // get underlying type.. and store in name
                 }
                 if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                 {
@@ -2493,26 +2541,15 @@ namespace QuickJSON
                 }
                 else if (name.Equals("DateTime"))
                 {
-                    DateTime? dt = token.DateTime(System.Globalization.CultureInfo.InvariantCulture);
-                    if (dt != null)
-                        return dt;
-                }
-                else if (converttype.IsEnum)
-                {
-                    if (!token.IsString)
+                    if ( token.IsString )       // must be a string
                     {
-                        System.Diagnostics.Debug.WriteLine($"JSONToObject: Enum Token is not string for {converttype.Name}");
-                        return new ToObjectError($"JSONToObject: Enum Token is not string for {converttype.Name}");
-                    }
-                    try
-                    {
-                        Object p = Enum.Parse(converttype, token.Str(), true);
-                        return Convert.ChangeType(p, converttype);
-                    }
-                    catch
-                    {
-                        System.Diagnostics.Debug.WriteLine($"JSONToObject: Unrecognised value '{token.Str()}' for enum {converttype.Name}");
-                        return new ToObjectError($"JSONToObject: Unrecognised value '{token.Str()}' for enum {converttype.Name}");
+                        string valuetext = token.Str();     // get string..
+                        if (preprocess != null)
+                            valuetext = preprocess(converttype, valuetext);
+                        if (DateTime.TryParse(valuetext, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
+                        {
+                            return ret;
+                        }
                     }
                 }
                 else if (name.Equals("Object"))                     // catch all, june 7/6/23 fix
@@ -2522,6 +2559,12 @@ namespace QuickJSON
                 return new ToObjectError("JSONToObject: Bad Conversion " + token.TokenType + " to " + converttype.Name);
             }
         }
+        public class ToObjectError
+        {
+            public string ErrorString;
+            public string PropertyName;
+            public ToObjectError(string s) { ErrorString = s; PropertyName = ""; }
+        };
     }
 }
 namespace QuickJSON
@@ -2638,7 +2681,9 @@ namespace QuickJSON
                 foreach (var e in jo)
                 {
                     bool notlast = i++ < jo.Count - 1;
-                    string name = e.Value.ParsedName ?? e.Key;          // so if its in the object we use the ParsedName, else we use Key
+                    string name = e.Key;          // We use the key name, but it may be synthetic, so if its in the object we use the ParsedName
+                    if (IsKeyNameSynthetic(name))   
+                        name = e.Value.ParsedName;
                     if (e.Value is JObject || e.Value is JArray)
                     {
                         if (stringliterals)
