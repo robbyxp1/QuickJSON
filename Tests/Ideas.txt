@@ -1,0 +1,429 @@
+﻿Ideas
+
+
+        /// <summary> Convert the JToken tree to an object of type.  This member will except.</summary>
+        /// <param name="token">JToken to convert from</param>
+        /// <param name="converttype">Type to convert to</param>
+        /// <param name="ignoretypeerrors">Ignore any errors in type between the JToken type and the member type.</param>
+        /// <param name="membersearchflags">Member search flags, to select what types of members are serialised.
+        /// Use the default plus DeclaredOnly for only members of the top class only </param>
+        /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
+        /// <param name="preprocess">For enums and datetime, and if set, preprocess the text before conversion. Return text to be converted</param>
+        /// <param name="process">For enums and datetime, and if set, process the text and return enum of correct type or Datetime</param>
+        /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
+        /// <exception cref="System.Exception"> Generic exception</exception>
+        /// <exception cref="System.InvalidCastException"> If a type failure occurs.  Other excepections could also occur.
+        /// </exception>
+        public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors,
+                System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
+                Object initialobject = null,
+                Func<Type, string, string> preprocess = null
+               )
+        {
+            var toc = new ToObjectConverter(initialobject, ignoretypeerrors, membersearchflags, preprocess);
+            return toc.Convert(token, converttype);
+        }
+
+
+        private class ToObjectConverter
+        {
+            private System.Reflection.BindingFlags membersearchflags;
+            private Object initialobject;
+            private Func<Type, string, string> preprocess;
+            private Func<Type, string, string> process;
+            private bool ignoretypeerrors;
+
+            public ToObjectConverter(Object initialobject, bool ignoretypeerrors, System.Reflection.BindingFlags membersearchflags, Func<Type, string, string> preprocess)
+            {
+                this.preprocess = preprocess;
+                this.initialobject = initialobject;
+                this.ignoretypeerrors = ignoretypeerrors;
+                this.membersearchflags = membersearchflags;
+            }
+
+            public Object Convert(JToken token, Type converttype)
+            {
+                if (token == null)
+                {
+                    return null;
+                }
+                else if (token.IsArray)
+                {
+                    JArray jarray = (JArray)token;
+
+                    try               // we need to protect this, as createinstance can fail here if a bad type is fed in, and we really want to report it via ObjectError
+                    {
+                        if (converttype.IsArray)        // need to handle arrays because it needs a defined length
+                        {
+                            dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, token.Count);   // dynamic holder for instance of array[]
+                            initialobject = null;
+
+                            for (int i = 0; i < token.Count; i++)
+                            {
+                                // get the underlying element, must match array element type
+
+                                Object ret = Convert(token[i], converttype.GetElementType());
+
+                                if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
+                                {
+                                    ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
+                                    return ret;
+                                }
+                                else
+                                {
+                                    dynamic d = converttype.GetElementType().ChangeTo(ret);
+                                    instance[i] = d;
+                                }
+                            }
+
+                            return instance;
+                        }
+                        else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(converttype))      // else anything which is enumerable can be handled
+                        {
+                            dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the List
+                            initialobject = null;
+
+                            var types = converttype.GetGenericArguments();
+
+                            for (int i = 0; i < token.Count; i++)
+                            {
+                                // get the underlying element, must match types[0] which is list type
+                                Object ret = Convert(token[i], types[0]);
+
+                                if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
+                                {
+                                    ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
+                                    return ret;
+                                }
+                                else
+                                {
+                                    dynamic d = types[0].ChangeTo(ret);
+                                    instance.Add(d);
+                                }
+                            }
+
+                            return instance;
+                        }
+                        else
+                            return new ToObjectError($"JSONToObject: Not array {converttype.Name}");        // catch all ending
+                    }
+                    catch (Exception ex)
+                    {
+                        return new ToObjectError($"JSONToObject: Create Error {converttype.Name} {ex.Message}");
+                    }
+
+                }
+                else if (token.TokenType == JToken.TType.Object)                   // objects are best efforts.. fills in as many fields as possible
+                {
+                    if (typeof(System.Collections.IDictionary).IsAssignableFrom(converttype))       // if its a Dictionary<x,y> then expect a set of objects
+                    {
+                        dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the class, so class must has a constructor with no paras
+                        initialobject = null;
+
+                        var types = converttype.GetGenericArguments();
+
+                        foreach (var kvp in (JObject)token)
+                        {
+                            // get the value as the dictionary type - it must match type or it get OE
+
+                            Object ret = Convert(kvp.Value, types[1]);
+
+                            if (ret != null && ret.GetType() == typeof(ToObjectError))
+                            {
+                                ((ToObjectError)ret).PropertyName = converttype.Name + "." + kvp.Key + "." + ((ToObjectError)ret).PropertyName;
+
+                                if (ignoretypeerrors)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("Ignoring Object error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
+                                }
+                                else
+                                {
+                                    return ret;
+                                }
+                            }
+                            else
+                            {
+                                dynamic k = types[0].ChangeTo(kvp.Key);             // convert kvp.Key, to the dictionary type. May except if not compatible
+                                dynamic d = types[1].ChangeTo(ret);                 // convert value to the data type.
+                                instance[k] = d;
+                            }
+                        }
+
+                        return instance;
+                    }
+                    else if (converttype.IsClass ||      // if class
+                             (converttype.IsValueType && !converttype.IsPrimitive && !converttype.IsEnum && converttype != typeof(DateTime)))   // or struct, but not datetime (handled below)
+                    {
+                        var instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the class, so class must has a constructor with no paras
+                        initialobject = null;
+
+                        // see if we have already dealt with this converttype
+
+                        Dictionary<string, System.Reflection.MemberInfo> NamesToMI;
+
+                        lock (CacheOfTypesToMembers)        // thread lock
+                        {
+                            // try and find previously computed info
+
+                            if (!CacheOfTypesToMembers.TryGetValue(converttype, out NamesToMI))
+                            {
+                                //System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Making new name cache for {converttype.Name}");
+
+                                // if not, compute
+
+                                NamesToMI = new Dictionary<string, System.Reflection.MemberInfo>();     // name -> MI, or name->Null if ignored
+
+                                System.Reflection.MemberInfo[] fi = converttype.GetFields(membersearchflags);        // get field list..
+                                foreach (var mi in fi)
+                                {
+                                    // compute if to be ignored
+                                    var ignoreattr = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                    bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
+
+                                    var attrlist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                    if (attrlist.Length == 1)       // if we have an attribute of this
+                                    {
+                                        var atlist = (JsonNameAttribute)attrlist[0];
+                                        foreach (var x in atlist.Names) // add all names and point to mi
+                                            NamesToMI[x] = includeit ? mi : null;
+                                    }
+                                    else
+                                        NamesToMI[mi.Name] = includeit ? mi : null;    // else add the object name
+                                }
+
+                                System.Reflection.MemberInfo[] pi = converttype.GetProperties(membersearchflags);   // add properties to list
+                                foreach (var pmi in pi)
+                                {
+                                    // compute if to be ignored
+                                    var ignoreattr = pmi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                    bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
+
+                                    var attrlist = pmi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                    if (attrlist.Length == 1)       // if we have an attribute of this
+                                    {
+                                        var atlist = (JsonNameAttribute)attrlist[0];
+                                        foreach (var x in atlist.Names) // add all names and point to mi
+                                            NamesToMI[x] = includeit ? pmi : null;
+                                    }
+                                    else
+                                        NamesToMI[pmi.Name] = includeit ? pmi : null;      // no custom attr, just add the object name
+                                }
+
+                                CacheOfTypesToMembers[converttype] = NamesToMI;
+                            }
+                        }
+
+                        foreach (var kvp in (JObject)token)
+                        {
+                            if (NamesToMI.TryGetValue(kvp.Key, out System.Reflection.MemberInfo mi))       // if can find
+                            {
+                                if (mi != null)                                   // ignore any ones with null as its member as its an ignored value
+                                {
+                                    Type otype = mi.FieldPropertyType();
+
+                                    if (otype != null)                          // and its a field or property
+                                    {
+                                        // get the value - must match otype.. ret may be zero for ? types
+
+                                        Object ret = Convert(kvp.Value, otype);
+
+                                        if (ret != null && ret.GetType() == typeof(ToObjectError))
+                                        {
+                                            ((ToObjectError)ret).PropertyName = converttype.Name + "." + kvp.Key + "." + ((ToObjectError)ret).PropertyName;
+
+                                            if (ignoretypeerrors)
+                                            {
+                                                if (JToken.TraceOutput)
+                                                    System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Ignoring Object error: {((ToObjectError)ret).ErrorString} : {((ToObjectError)ret).PropertyName}");
+                                            }
+                                            else
+                                            {
+                                                return ret;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (!mi.SetValue(instance, ret))         // and set. Set will fail if the property is get only
+                                            {
+                                                if (ignoretypeerrors)
+                                                {
+                                                    if (JToken.TraceOutput)
+                                                        System.Diagnostics.Trace.WriteLine("QuickJSON ToObject Ignoring cannot set value on property " + mi.Name);
+                                                }
+                                                else
+                                                {
+                                                    return new ToObjectError("Cannot set value on property " + mi.Name);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"ToObject ignore {converttype.Name}:{kvp.Key}");
+                                }
+                            }
+                            else
+                            {
+                                // System.Diagnostics.Debug.WriteLine("JSONToObject: No such member " + kvp.Key + " in " + tt.Name);
+                            }
+                        }
+
+                        return instance;
+                    }
+                    else
+                        return new ToObjectError($"JSONToObject: Not class {converttype.Name}");
+                }
+                else if (converttype.IsEnum)
+                {
+                    if (!token.IsString)
+                    {
+                        if (TraceOutput)
+                            System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Enum Token is not string for {converttype.Name}");
+
+                        return new ToObjectError($"JSONToObject: Enum Token is not string for {converttype.Name}");
+                    }
+
+                    try
+                    {
+                        string valuetext = (string)token.Value;
+                        if (preprocess != null)
+                            valuetext = preprocess(converttype, valuetext);
+                        Object p = Enum.Parse(converttype, valuetext, true);
+                        return System.Convert.ChangeType(p, converttype);
+                    }
+                    catch
+                    {
+                        if (TraceOutput)
+                            System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Unrecognised value '{token.Str()}' for enum {converttype.Name}");
+
+                        return new ToObjectError($"JSONToObject: Unrecognised value '{token.Str()}' for enum {converttype.Name}");
+                    }
+                }
+                else
+                {
+                    string name = converttype.Name;                         // compare by name quicker than is
+
+                    if (name.Equals("Nullable`1"))                          // nullable types
+                    {
+                        if (token.IsNull)
+                            return null;
+
+                        name = converttype.GenericTypeArguments[0].Name;    // get underlying type.. and store in name
+                    }
+
+                    // now check type
+
+                    if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
+                    {
+                        if (token.IsNull)
+                            return null;
+                        else if (token.IsString)
+                            return token.Value;
+                    }
+                    else if (name.Equals("Int32"))
+                    {
+                        if (token.TokenType == TType.Long)                  // it won't be a ulong/bigint since that would be too big for an int
+                            return (int)(long)token.Value;
+                        else if (token.TokenType == TType.Double)           // doubles get trunced.. as per previous system
+                            return (int)(double)token.Value;
+                    }
+                    else if (name.Equals("Int64"))
+                    {
+                        if (token.TokenType == TType.Long)
+                            return token.Value;
+                        else if (token.TokenType == TType.Double)
+                            return (long)(double)token.Value;
+                    }
+                    else if (name.Equals("Boolean"))
+                    {
+                        if (token.TokenType == TType.Boolean)
+                            return (bool)token.Value;
+                        else if (token.TokenType == TType.Long)
+                            return (long)token.Value != 0;
+                    }
+                    else if (name.Equals("Double"))
+                    {
+                        if (token.TokenType == TType.Long)
+                            return (double)(long)token.Value;
+                        else if (token.TokenType == TType.ULong)
+                            return (double)(ulong)token.Value;
+#if JSONBIGINT
+                        else if (token.TokenType == TType.BigInt)
+                            return (double)(System.Numerics.BigInteger)token.Value;
+#endif
+                        else if (token.TokenType == TType.Double)
+                            return (double)token.Value;
+                    }
+                    else if (name.Equals("Single"))
+                    {
+                        if (token.TokenType == TType.Long)
+                            return (float)(long)token.Value;
+                        else if (token.TokenType == TType.ULong)
+                            return (float)(ulong)token.Value;
+#if JSONBIGINT
+                        else if (token.TokenType == TType.BigInt)
+                            return (float)(System.Numerics.BigInteger)token.Value;
+#endif
+                        else if (token.TokenType == TType.Double)
+                            return (float)(double)token.Value;
+                    }
+                    else if (name.Equals("UInt32"))
+                    {
+                        if (token.TokenType == TType.Long && (long)token.Value >= 0)
+                            return (uint)(long)token.Value;
+                        else if (token.TokenType == TType.Double && (double)token.Value >= 0)
+                            return (uint)(double)token.Value;
+                    }
+                    else if (name.Equals("UInt64"))
+                    {
+                        if (token.TokenType == TType.ULong)
+                            return (ulong)token.Value;
+                        else if (token.TokenType == TType.Long && (long)token.Value >= 0)
+                            return (ulong)(long)token.Value;
+                        else if (token.TokenType == TType.Double && (double)token.Value >= 0)
+                            return (ulong)(double)token.Value;
+                    }
+                    else if (name.Equals("DateTime"))
+                    {
+                        if (token.IsString)       // must be a string
+                        {
+                            string valuetext = (string)token.Value;     // get string..
+                            if (preprocess != null)
+                                valuetext = preprocess(converttype, valuetext);
+                            if (DateTime.TryParse(valuetext, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
+                            {
+                                return ret;
+                            }
+                        }
+                    }
+                    else if (name.Equals("Object"))                     // catch all, june 7/6/23 fix
+                    {
+                        return token.Value;
+                    }
+
+                    return new ToObjectError("JSONToObject: Bad Conversion " + token.TokenType + " to " + converttype.Name);
+                }
+
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

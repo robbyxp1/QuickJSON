@@ -55,13 +55,25 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Extensions.cs" />
+    <Compile Include="JSONToObjectShipLocker.cs" />
+    <Compile Include="JSONToObjectLoadout.cs" />
+    <Compile Include="JSONToStringSpeed.cs" />
+    <Compile Include="JSONBadFormatting.cs" />
+    <Compile Include="JSONAltNames.cs" />
+    <Compile Include="JSONRoundTrip.cs" />
+    <Compile Include="JSONCloneEquals.cs" />
+    <Compile Include="JSONSpeed.cs" />
+    <Compile Include="JSONGithub.cs" />
+    <Compile Include="JSONRemoval.cs" />
+    <Compile Include="JSONComplexObject.cs" />
+    <Compile Include="JSONArray.cs" />
     <Compile Include="JSONPaths.cs" />
     <Compile Include="JSONFluent.cs" />
+    <Compile Include="JSONBasic.cs" />
     <Compile Include="JSONToObject.cs" />
     <Compile Include="JSONSchema.cs" />
     <Compile Include="JSONFromObject.cs" />
     <Compile Include="JSONTextreader.cs" />
-    <Compile Include="JSONTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
@@ -113,6 +125,9 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Ideas.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

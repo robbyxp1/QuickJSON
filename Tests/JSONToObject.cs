@@ -29,7 +29,7 @@ using Tests;
 namespace JSONTests
 {
     [TestFixture(TestOf = typeof(JToken))]
-    public class JSONToObjectTest
+    public partial class JSONToObjectTests
     {
         public class OtherTypes
         {
@@ -102,6 +102,14 @@ namespace JSONTests
             public int three;
             public bool four;
         }
+        public class IgnoreTest
+        {
+            [JsonIgnore()]
+            public string one;
+            public string two;
+            public int three;
+            public bool four;
+        }
 
         public class Unlocked
         {
@@ -133,8 +141,129 @@ namespace JSONTests
 
 
         [Test]
+        public void JSONToObjectRedirectedNames()
+        {
+            {
+                string jmd = @"
+{
+  ""timestamp"": ""2018 - 04 - 24T21: 25:46Z"",
+  ""event"": ""TechnologyBroker"",
+  ""BrokerType"": ""guardian"",
+  ""MarketID"": 3223529472,
+  ""ItemsUnlocked"": [
+    {
+      ""Name"": ""Int_GuardianPowerplant_Size2"",
+      ""Name_Localised"": ""Guardian Power Plant""
+    },
+    {
+      ""Name"": ""Int_GuardianPowerplant_Size3"",
+      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
+    },
+    {
+      ""Name"": ""Int_GuardianPowerplant_Size4"",
+      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
+    },
+    {
+      ""Name"": ""Int_GuardianPowerplant_Size5"",
+      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
+    },
+    {
+      ""Name"": ""Int_GuardianPowerplant_Size6"",
+      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
+    },
+    {
+      ""Name"": ""Int_GuardianPowerplant_Size7"",
+      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
+    },
+    {
+      ""Name"": ""Int_GuardianPowerplant_Size8"",
+      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
+    }
+  ],
+  ""Commodities"": [
+    {
+      ""Name"": ""powergridassembly"",
+      ""Name_Localised"": ""Energy Grid Assembly"",
+      ""Count"": 10
+    }
+  ],
+  ""Materials"": [
+   {
+      ""Name"": ""heatresistantceramics"",
+      ""Name_Localised"": ""Heat Resistant Ceramics"",
+      ""Count"": 30,
+      ""Category"": ""Manufactured"",
+      ""QValue"": 20,
+      ""RValue"": 2000
+    },
+    {
+      ""Name"": ""guardian_moduleblueprint"",
+      ""Name_Localised"": ""Guardian Module Blueprint Segment"",
+      ""Count"": 4,
+      ""Category"": ""Encoded""
+    },
+    {
+      ""Name"": ""guardian_powerconduit"",
+      ""Name_Localised"": ""Guardian Power Conduit"",
+      ""Count"": 36,
+      ""Category"": ""Manufactured""
+    },
+    {
+      ""Name"": ""ancienttechnologicaldata"",
+      ""Name_Localised"": ""Pattern Epsilon Obelisk Data"",
+      ""Count"": 42,
+      ""Category"": ""Encoded""
+    }
+   ]
+}";
+
+
+                JToken decode = JToken.Parse(jmd);
+                Check.That(decode).IsNotNull();
+                string json1 = decode.ToString(true);
+                System.Diagnostics.Debug.WriteLine(json1);
+
+                var MaterialList = decode["Materials"].ToObject<Materials[]>();
+                Check.That(MaterialList).IsNotNull();
+                Check.That(MaterialList.Length).IsEqualTo(4);
+                Check.That(MaterialList[0].qint).IsEqualTo(20);
+                Check.That(MaterialList[0].rint).IsEqualTo(2000);
+
+                var ItemsUnlocked1 = decode["WrongNameItemsUnlocked"].ToObject(typeof(Unlocked[]), false);
+                Check.That(ItemsUnlocked1).IsNull();
+                var ItemsUnlocked = decode["ItemsUnlocked"].ToObject(typeof(Unlocked[]), false);
+                Check.That(ItemsUnlocked).IsNotNull();
+                var CommodityList = decode["Commodities"].ToObject<Commodities[]>();
+                Check.That(CommodityList).IsNotNull();
+
+
+            }
+        }
+
+        [Test]
+        public void JSONToObjectIgnoreTest()
+        {
+            string json = "{ \"one\":\"one\", \"two\":\"two\" , \"three\":30, \"four\":true }";
+            JToken decode = JToken.Parse(json);
+
+            IgnoreTest decoded = decode.ToObject<IgnoreTest>(true);
+            Check.That(decoded).IsNotNull();
+            Check.That(decoded.one == null);
+            Check.That(decoded.two == "two");
+            Check.That(decoded.three == 30);
+            Check.That(decoded.four == true);
+        }
+
+        [Test]
         public void JSONToObject()
         {
+            {
+                string matlist = @"{ ""Raw"":{ ""t1"":""three"" } }";
+                JToken matlistj = JToken.Parse(matlist);
+                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false);
+                Check.That(((FromObjectTest)Raw).t1).Equals(TestEnum.three);
+
+            }
             {
                 string json = @"{
                               ""GD"":true,
@@ -349,12 +478,12 @@ namespace JSONTests
                 string json = "[ \"one\",\"two\",\"three\" ] ";
                 JToken decode = JToken.Parse(json);
 
-                var decoded = decode.ToObject(typeof(string[]), false, true);
+                var decoded = decode.ToObject(typeof(string[]), false);
                 if (decoded is JTokenExtensions.ToObjectError)
                     System.Diagnostics.Debug.WriteLine("Err " + ((JTokenExtensions.ToObjectError)decoded).ErrorString);
 
 
-                var decoded2 = decode.ToObject(typeof(string), false, true);
+                var decoded2 = decode.ToObject(typeof(string), false);
                 Check.That(decoded2).IsInstanceOfType(typeof(JTokenExtensions.ToObjectError));
                 if (decoded2 is JTokenExtensions.ToObjectError)
                     System.Diagnostics.Debug.WriteLine("Err " + ((JTokenExtensions.ToObjectError)decoded2).ErrorString);
@@ -364,105 +493,11 @@ namespace JSONTests
                 string json = "{ \"one\":\"one\", \"two\":\"two\" , \"three\":30, \"four\":true }";
                 JToken decode = JToken.Parse(json);
 
-                var decoded = decode.ToObject(typeof(SimpleTest), false, true);
+                var decoded = decode.ToObject(typeof(SimpleTest), false);
                 if (decoded is JTokenExtensions.ToObjectError)
                     System.Diagnostics.Debug.WriteLine("Err " + ((JTokenExtensions.ToObjectError)decoded).ErrorString);
             }
 
-            {
-                string jmd = @"
-{
-  ""timestamp"": ""2018 - 04 - 24T21: 25:46Z"",
-  ""event"": ""TechnologyBroker"",
-  ""BrokerType"": ""guardian"",
-  ""MarketID"": 3223529472,
-  ""ItemsUnlocked"": [
-    {
-      ""Name"": ""Int_GuardianPowerplant_Size2"",
-      ""Name_Localised"": ""Guardian Power Plant""
-    },
-    {
-      ""Name"": ""Int_GuardianPowerplant_Size3"",
-      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
-    },
-    {
-      ""Name"": ""Int_GuardianPowerplant_Size4"",
-      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
-    },
-    {
-      ""Name"": ""Int_GuardianPowerplant_Size5"",
-      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
-    },
-    {
-      ""Name"": ""Int_GuardianPowerplant_Size6"",
-      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
-    },
-    {
-      ""Name"": ""Int_GuardianPowerplant_Size7"",
-      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
-    },
-    {
-      ""Name"": ""Int_GuardianPowerplant_Size8"",
-      ""Name_Localised"": ""$Int_GuardianPowerplant_Size2_Name;""
-    }
-  ],
-  ""Commodities"": [
-    {
-      ""Name"": ""powergridassembly"",
-      ""Name_Localised"": ""Energy Grid Assembly"",
-      ""Count"": 10
-    }
-  ],
-  ""Materials"": [
-    {
-      ""Name"": ""guardian_moduleblueprint"",
-      ""Name_Localised"": ""Guardian Module Blueprint Segment"",
-      ""Count"": 4,
-      ""Category"": ""Encoded""
-    },
-    {
-      ""Name"": ""guardian_powerconduit"",
-      ""Name_Localised"": ""Guardian Power Conduit"",
-      ""Count"": 36,
-      ""Category"": ""Manufactured""
-    },
-    {
-      ""Name"": ""ancienttechnologicaldata"",
-      ""Name_Localised"": ""Pattern Epsilon Obelisk Data"",
-      ""Count"": 42,
-      ""Category"": ""Encoded""
-    },
-    {
-      ""Name"": ""heatresistantceramics"",
-      ""Name_Localised"": ""Heat Resistant Ceramics"",
-      ""Count"": 30,
-      ""Category"": ""Manufactured"",
-      ""QValue"": 20,
-      ""RValue"": 2000
-    }
-  ]
-}";
-
-
-                JToken decode = JToken.Parse(jmd);
-                Check.That(decode).IsNotNull();
-                string json1 = decode.ToString(true);
-                System.Diagnostics.Debug.WriteLine(json1);
-
-                var ItemsUnlocked1 = decode["WrongNameItemsUnlocked"].ToObject(typeof(Unlocked[]), false, true);
-                Check.That(ItemsUnlocked1).IsNull();
-                var ItemsUnlocked = decode["ItemsUnlocked"].ToObject(typeof(Unlocked[]), false, true);
-                Check.That(ItemsUnlocked).IsNotNull();
-                var CommodityList = decode["Commodities"].ToObject<Commodities[]>();
-                Check.That(CommodityList).IsNotNull();
-                var MaterialList = decode["Materials"].ToObject<Materials[]>();
-                Check.That(MaterialList).IsNotNull();
-                Check.That(MaterialList.Length).IsEqualTo(4);
-                Check.That(MaterialList[3].qint).IsEqualTo(20);
-                Check.That(MaterialList[3].rint).IsEqualTo(2000);
-
-
-            }
             {
                 string listp2 = @"{ ""Materials"":[ ""iron"" , ""nickel"" ]}";
                 JToken evt3 = JObject.Parse(listp2);
@@ -506,7 +541,7 @@ namespace JSONTests
             {
                 string matlist = @"{ ""Raw"":[ { ""Name"":""iron"", ""Count"":10 }, { ""Name"":""sulphur"", ""Count"":17 } ] }";
                 JToken matlistj = JToken.Parse(matlist);
-                var Raw = matlistj["Raw"]?.ToObject(typeof(MaterialIncorrect), false, false);
+                var Raw = matlistj["Raw"]?.ToObject(typeof(MaterialIncorrect), false);
                 Check.That(((JTokenExtensions.ToObjectError)Raw).ErrorString.Contains("Not Array"));
 
             }
@@ -514,7 +549,7 @@ namespace JSONTests
             {
                 string matlist = @"{ ""Raw"":{ ""t1"":""iron"" } }";
                 JToken matlistj = JToken.Parse(matlist);
-                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, false);
+                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false);
                 Check.That(((JTokenExtensions.ToObjectError)Raw).ErrorString.Contains("Unrecognised"));
 
             }
@@ -522,25 +557,18 @@ namespace JSONTests
             {
                 string matlist = @"{ ""Raw"":{ ""t1"":10 } }";
                 JToken matlistj = JToken.Parse(matlist);
-                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, false);
+                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false);
                 Check.That(((JTokenExtensions.ToObjectError)Raw).ErrorString.Contains("Enum Token is not string"));
 
             }
 
-            {
-                string matlist = @"{ ""Raw"":{ ""t1"":""three"" } }";
-                JToken matlistj = JToken.Parse(matlist);
-                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, false);
-                Check.That(((FromObjectTest)Raw).t1).Equals(TestEnum.three);
-
-            }
 
             {
                 string matlist = @"{ ""Raw"":{ ""t1"":""$three;"" } }";
                 JToken matlistj = JToken.Parse(matlist);
-                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, false, preprocess:(type,text)=> {
+                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, process:(type,text)=> {
                     if (type == typeof(TestEnum))
-                        return text.Substring(1, text.Length - 2);
+                        return Enum.Parse(typeof(TestEnum),text.Substring(1, text.Length - 2),true);
                     else
                         return "CRAP";
                 });
