@@ -2168,24 +2168,21 @@ namespace QuickJSON
     }
   
 }
+#define ENABLEINLINE
 namespace QuickJSON
 {
     public static class JTokenExtensions
     {
         public static T ToObjectQ<T>(this JToken token)          
         {
-            return ToObject<T>(token, false, false);
+            return ToObject<T>(token, false, null);
         }
-        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, bool checkcustomattr = true)
-        {
-            return ToObject<T>(token, ignoretypeerrors, checkcustomattr, null);
-        }
-        public static T ToObject<T>(this JToken token, bool ignoretypeerrors, bool checkcustomattr, Func<Type, string, string> preprocess)
+        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, Func<Type, string, object> process = null)
         {
             Type tt = typeof(T);
             try
             {
-                Object ret = token.ToObject(tt, ignoretypeerrors, checkcustomattr,preprocess:preprocess);        // paranoia, since there are a lot of dynamics, trap any exceptions
+                Object ret = token.ToObject(tt, ignoretypeerrors,process:process);        // paranoia, since there are a lot of dynamics, trap any exceptions
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -2200,14 +2197,14 @@ namespace QuickJSON
             }
             return default(T);
         }
-        public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors, bool checkcustomattr,
+        public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors, 
                                     System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
                                     Object initialobject = null,
-                                    Func<Type, string, string> preprocess = null)
+                                    Func<Type, string, object> process = null)
         {
             try
             {
-                return ToObject(token, converttype, ignoretypeerrors, checkcustomattr, membersearchflags, initialobject, preprocess);
+                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process);
             }
             catch (Exception ex)
             {
@@ -2216,10 +2213,11 @@ namespace QuickJSON
             return null;
        
         }
-        public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors, bool checkcustomattr,
-                System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-                Object initialobject = null,
-                Func<Type, string, string> preprocess = null)
+        public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors,
+            System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
+            Object initialobject = null,
+            Func<Type, string, object> process = null
+            )
         {
             if (token == null)
             {
@@ -2235,7 +2233,7 @@ namespace QuickJSON
                         dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, token.Count);   // dynamic holder for instance of array[]
                         for (int i = 0; i < token.Count; i++)
                         {
-                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, checkcustomattr, preprocess: preprocess);
+                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, membersearchflags: membersearchflags, process: process);
                             if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
                             {
                                 ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
@@ -2255,7 +2253,7 @@ namespace QuickJSON
                         var types = converttype.GetGenericArguments();
                         for (int i = 0; i < token.Count; i++)
                         {
-                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, checkcustomattr, preprocess: preprocess);
+                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, membersearchflags: membersearchflags, process: process);
                             if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
                             {
                                 ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
@@ -2285,7 +2283,7 @@ namespace QuickJSON
                     var types = converttype.GetGenericArguments();
                     foreach (var kvp in (JObject)token)
                     {
-                        Object ret = ToObject(kvp.Value, types[1], ignoretypeerrors, checkcustomattr, preprocess: preprocess);
+                        Object ret = ToObject(kvp.Value, types[1], ignoretypeerrors, membersearchflags: membersearchflags, process: process);
                         if (ret != null && ret.GetType() == typeof(ToObjectError))
                         {
                             ((ToObjectError)ret).PropertyName = converttype.Name + "." + kvp.Key + "." + ((ToObjectError)ret).PropertyName;
@@ -2311,121 +2309,195 @@ namespace QuickJSON
                          (converttype.IsValueType && !converttype.IsPrimitive && !converttype.IsEnum && converttype != typeof(DateTime)))   // or struct, but not datetime (handled below)
                 {
                     var instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the class, so class must has a constructor with no paras
-                    System.Reflection.MemberInfo[] fi = converttype.GetFields(membersearchflags);        // get field list..
-                    object[] finames = null;        // alternate names of all fields, loaded only if checkcustom is on,  Object array of string[]
-                    System.Reflection.MemberInfo[] pi = null;   // lazy load the property list
-                    object[] pinames = null;       // alternate names of all the properties,  Object array of string[]
-                    if (checkcustomattr)
+                    Dictionary<string, System.Reflection.MemberInfo> NamesToMI;
+                    lock ( CacheOfTypesToMembers)        // thread lock
                     {
-                        finames = new object[fi.Length];
-                        for (int i = 0; i < fi.Length; i++)     // thru all the fi fields, see if they have a custom attribute of JsonNameAttribute, if so, pick up the names list
+                        if (!CacheOfTypesToMembers.TryGetValue(converttype, out NamesToMI))
                         {
-                            var attrlist = fi[i].GetCustomAttributes(typeof(JsonNameAttribute), false);
-                            if (attrlist.Length == 1)
-                                finames[i] = ((dynamic)attrlist[0]).Names;
-                            else
-                                finames[i] = new string[] { fi[i].Name };
+                            NamesToMI = new Dictionary<string, System.Reflection.MemberInfo>();     // name -> MI, or name->Null if ignored
+                            System.Reflection.MemberInfo[] fi = converttype.GetFields(membersearchflags);        // get field list..
+                            foreach (var mi in fi)
+                            {
+                                var ignoreattr = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
+                                var attrlist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                if (attrlist.Length == 1)       // if we have an attribute of this
+                                {
+                                    var atlist = (JsonNameAttribute)attrlist[0];
+                                    foreach (var x in atlist.Names) // add all names and point to mi
+                                        NamesToMI[x] = includeit ? mi : null;
+                                }
+                                else
+                                    NamesToMI[mi.Name] = includeit ? mi : null;    // else add the object name
+                            }
+                            System.Reflection.MemberInfo[] pi = converttype.GetProperties(membersearchflags);   // add properties to list
+                            foreach (var pmi in pi)
+                            {
+                                var ignoreattr = pmi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
+                                var attrlist = pmi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                if (attrlist.Length == 1)       // if we have an attribute of this
+                                {
+                                    var atlist = (JsonNameAttribute)attrlist[0];
+                                    foreach (var x in atlist.Names) // add all names and point to mi
+                                        NamesToMI[x] = includeit ? pmi : null;
+                                }
+                                else
+                                    NamesToMI[pmi.Name] = includeit ? pmi : null;      // no custom attr, just add the object name
+                            }
+                            CacheOfTypesToMembers[converttype] = NamesToMI;
                         }
                     }
                     foreach (var kvp in (JObject)token)
                     {
-                        System.Reflection.MemberInfo mi = null;
-                        if (finames == null)
+                        if ( NamesToMI.TryGetValue(kvp.Key, out System.Reflection.MemberInfo mi))       // if can find
                         {
-                            var fipos = System.Array.FindIndex(fi, x => x.Name.Equals(kvp.Key, StringComparison.InvariantCultureIgnoreCase));     // straight name lookup
-                            if (fipos >= 0)
-                                mi = fi[fipos];
-                        }
-                        else
-                        {
-                            for (int fipos = 0; fipos < finames.Length; fipos++)
+                            if (mi!=null)                                   // ignore any ones with null as its member as its an ignored value
                             {
-                                if (System.Array.IndexOf((string[])finames[fipos], kvp.Key) >= 0)
+                                Type otype = mi.FieldPropertyType();        
+                                string name = otype.Name;                         // compare by name quicker than is
+                                var tk = kvp.Value;
+                                bool success = false;
+#if ENABLEINLINE
+                                if (name.Equals("Nullable`1"))                          // nullable types
                                 {
-                                    mi = fi[fipos];
-                                    break;
+                                    if (!tk.IsNull)         // if not null, then get underlying type.. and store in name. If null, its a null and below will set it to null
+                                        name = otype.GenericTypeArguments[0].Name;    // get 
                                 }
-                            }
-                        }
-                        if (mi == null)
-                        {
-                            if (pi == null)     // lazy load pick up, only load these if fields not found
-                            {
-                                pi = converttype.GetProperties(membersearchflags);
-                                if (checkcustomattr)
+                                if (tk.IsArray || tk.IsObject)
                                 {
-                                    pinames = new object[pi.Length];
-                                    for (int i = 0; i < pi.Length; i++)
-                                    {
-                                        var attrlist = pi[i].GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                        if (attrlist.Length == 1)
-                                            pinames[i] = ((dynamic)attrlist[0]).Names;
-                                        else
-                                            pinames[i] = new string[] { pi[i].Name };
-                                    }
+                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags: membersearchflags, process: process);
+                                    success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
+                                    if (success)      // if good, set 
+                                        success = mi.SetValue(instance, ret);
                                 }
-                            }
-                            if (pinames == null)
-                            {
-                                var pipos = System.Array.FindIndex(pi, x => x.Name.Equals(kvp.Key, StringComparison.InvariantCultureIgnoreCase));
-                                if (pipos >= 0)
-                                    mi = pi[pipos];
-                            }
-                            else
-                            {
-                                for (int pipos = 0; pipos < pinames.Length; pipos++)
+                                else
+                                if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                                 {
-                                    if (System.Array.IndexOf((string[])pinames[pipos], kvp.Key) >= 0)
-                                    {
-                                        mi = pi[pipos];
-                                        break;
-                                    }
+                                    if (tk.IsNull)
+                                        success = mi.SetValue(instance, null);
+                                    else if (tk.IsString)
+                                        success = mi.SetValue(instance, (string)tk.Value);
                                 }
-                            }
-                        }
-                        if (mi != null)                                   // if we found a class member
-                        {
-                            var ca = checkcustomattr ? mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false) : null;
-                            bool includeit = ca == null || ca.Length == 0 || (((JsonIgnoreAttribute)ca[0]).Ignore != null) || (((JsonIgnoreAttribute)ca[0]).IncludeOnly != null);
-                            if (includeit)                                              // ignore any ones with JsonIgnore on it which is empty of parameters
-                            {
-                                Type otype = mi.FieldPropertyType();
-                                if (otype != null)                          // and its a field or property
+                                else if (name.Equals("Int64"))
                                 {
-                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, checkcustomattr, preprocess: preprocess);
-                                    if (ret != null && ret.GetType() == typeof(ToObjectError))
+                                    if (tk.TokenType == TType.Long)
+                                        success = mi.SetValue(instance, tk.Value);
+                                    else if (tk.TokenType == TType.Double)
+                                        success = mi.SetValue(instance, (long)(double)tk.Value);
+                                }
+                                else if (name.Equals("Double"))
+                                {
+                                    if (tk.TokenType == TType.Long)
+                                        success = mi.SetValue(instance, (double)(long)tk.Value);
+                                    else if (tk.TokenType == TType.ULong)
+                                        success = mi.SetValue(instance, (double)(ulong)tk.Value);
+#if JSONBIGINT
+                                    else if (tk.TokenType == TType.BigInt)
+                                        success = mi.SetValue(instance, (double)(System.Numerics.BigInteger)tk.Value);
+#endif
+                                    else if (tk.TokenType == TType.Double)
+                                        success = mi.SetValue(instance, (double)tk.Value);
+                                }
+                                else if (name.Equals("Int32"))
+                                {
+                                    if (tk.TokenType == TType.Long)                  // it won't be a ulong/bigint since that would be too big for an int
+                                        success = mi.SetValue(instance, (int)(long)tk.Value);
+                                    else if (tk.TokenType == TType.Double)           // doubles get trunced.. as per previous system
+                                        success = mi.SetValue(instance, (int)(double)tk.Value);
+                                }
+                                else if (name.Equals("Boolean"))
+                                {
+                                    if (tk.TokenType == TType.Boolean)
+                                        success = mi.SetValue(instance, (bool)tk.Value);
+                                    else if (tk.TokenType == TType.Long)
+                                        success = mi.SetValue(instance, (long)tk.Value != 0);
+                                }
+                                else if (name.Equals("Single"))
+                                {
+                                    if (tk.TokenType == TType.Long)
+                                        success = mi.SetValue(instance, (float)(long)tk.Value);
+                                    else if (tk.TokenType == TType.ULong)
+                                        success = mi.SetValue(instance, (float)(ulong)tk.Value);
+#if JSONBIGINT
+                                    else if (tk.TokenType == TType.BigInt)
+                                        success = mi.SetValue(instance, (float)(System.Numerics.BigInteger)tk.Value);
+#endif
+                                    else if (tk.TokenType == TType.Double)
+                                        success = mi.SetValue(instance, (float)(double)tk.Value);
+                                }
+                                else 
+                                if (otype.IsEnum)
+                                {
+                                    if (tk.IsString)     // if string, possible
                                     {
-                                        ((ToObjectError)ret).PropertyName = converttype.Name + "." + kvp.Key + "." + ((ToObjectError)ret).PropertyName;
-                                        if (ignoretypeerrors)
+                                        Object p = null;
+                                        if (process != null)    // process can return value
                                         {
-                                            if (JToken.TraceOutput)
-                                                System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Ignoring Object error: {((ToObjectError)ret).ErrorString} : {((ToObjectError)ret).PropertyName}");
+                                            p = process(otype, (string)tk.Value);
+                                            if (p != null && p.GetType() != typeof(ToObjectError))  // if good, and not error, try set
+                                                success = mi.SetValue(instance, p);
                                         }
                                         else
                                         {
-                                            return ret;
+                                            try
+                                            {
+                                                p = Enum.Parse(otype, (string)tk.Value, true); // get object, will except if bad, in which case we just swallow
+                                                success = mi.SetValue(instance, p);
+                                            }
+                                            catch
+                                            {   // error, leave success off
+                                                if (JToken.TraceOutput)
+                                                    System.Diagnostics.Trace.WriteLine("QuickJSON ToObject Ignoring cannot convert string to enum on property " + mi.Name);
+                                            }
                                         }
+                                    }
+                                }
+                                else if (name.Equals("UInt32"))
+                                {
+                                    if (tk.TokenType == TType.Long && (long)tk.Value >= 0)
+                                        success = mi.SetValue(instance, (uint)(long)tk.Value);
+                                    else if (tk.TokenType == TType.Double && (double)tk.Value >= 0)
+                                        success = mi.SetValue(instance, (uint)(double)tk.Value);
+                                }
+                                else if (name.Equals("UInt64"))
+                                {
+                                    if (tk.TokenType == TType.ULong)
+                                        success = mi.SetValue(instance, (ulong)tk.Value);
+                                    else if (tk.TokenType == TType.Long && (long)tk.Value >= 0)
+                                        success = mi.SetValue(instance, (ulong)(long)tk.Value);
+                                    else if (tk.TokenType == TType.Double && (double)tk.Value >= 0)
+                                        success = mi.SetValue(instance, (ulong)(double)tk.Value);
+                                }
+                                else if (name.Equals("Nullable`1"))                     // name stays nullable`1 if value is null
+                                {
+                                    success = mi.SetValue(instance, null);
+                                }
+                                else
+#endif
+                                {
+                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags: membersearchflags, process: process);
+                                    success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
+                                    if (success)      // if good, set 
+                                        success = mi.SetValue(instance, ret);
+                                }
+                                if (!success)
+                                {
+                                    if (ignoretypeerrors)
+                                    {
+                                        if (JToken.TraceOutput)
+                                            System.Diagnostics.Trace.WriteLine("QuickJSON ToObject Ignoring cannot set value on property " + mi.Name);
+                                        success = true;
                                     }
                                     else
                                     {
-                                        if (!mi.SetValue(instance, ret))         // and set. Set will fail if the property is get only
-                                        {
-                                            if (ignoretypeerrors)
-                                            {
-                                                if (JToken.TraceOutput)
-                                                    System.Diagnostics.Trace.WriteLine("QuickJSON ToObject Ignoring cannot set value on property " + mi.Name);
-                                            }
-                                            else
-                                            {
-                                                return new ToObjectError("Cannot set value on property " + mi.Name);
-                                            }
-                                        }
+                                        return new ToObjectError("Cannot set value on property " + mi.Name);
                                     }
                                 }
                             }
                             else
                             {
-                                System.Diagnostics.Debug.WriteLine($"ToObject ignore {mi.Name}");
+                                System.Diagnostics.Debug.WriteLine($"ToObject ignore {converttype.Name}:{kvp.Key}");
                             }
                         }
                         else
@@ -2447,11 +2519,12 @@ namespace QuickJSON
                 }
                 try
                 {
-                    string valuetext = token.Str();
-                    if (preprocess != null)
-                        valuetext = preprocess(converttype, valuetext);
-                    Object p = Enum.Parse(converttype, valuetext, true);
-                    return Convert.ChangeType(p, converttype);
+                    if (process != null)
+                        return process(converttype, (string)token.Value);
+                    else
+                    {
+                        return Enum.Parse(converttype, (string)token.Value, true);
+                    }
                 }
                 catch
                 {
@@ -2461,102 +2534,105 @@ namespace QuickJSON
                 }
             }
             else
-            { 
+            {
+                var tk = token;
                 string name = converttype.Name;                         // compare by name quicker than is
                 if (name.Equals("Nullable`1"))                          // nullable types
                 {
-                    if (token.IsNull)
+                    if (tk.IsNull)
                         return null;
                     name = converttype.GenericTypeArguments[0].Name;    // get underlying type.. and store in name
                 }
                 if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                 {
-                    if (token.IsNull)
+                    if (tk.IsNull)
                         return null;
-                    else if (token.IsString)
-                        return token.Value;
+                    else if (tk.IsString)
+                        return tk.Value;
                 }
                 else if (name.Equals("Int32"))
                 {
-                    if (token.TokenType == TType.Long)                  // it won't be a ulong/bigint since that would be too big for an int
-                        return (int)(long)token.Value;
-                    else if (token.TokenType == TType.Double)           // doubles get trunced.. as per previous system
-                        return (int)(double)token.Value;
+                    if (tk.TokenType == TType.Long)                  // it won't be a ulong/bigint since that would be too big for an int
+                        return (int)(long)tk.Value;
+                    else if (tk.TokenType == TType.Double)           // doubles get trunced.. as per previous system
+                        return (int)(double)tk.Value;
                 }
                 else if (name.Equals("Int64"))
                 {
-                    if (token.TokenType == TType.Long)
-                        return token.Value;
-                    else if (token.TokenType == TType.Double)
-                        return (long)(double)token.Value;
+                    if (tk.TokenType == TType.Long)
+                        return tk.Value;
+                    else if (tk.TokenType == TType.Double)
+                        return (long)(double)tk.Value;
                 }
                 else if (name.Equals("Boolean"))
                 {
-                    if (token.TokenType == TType.Boolean)
-                        return (bool)token.Value;
-                    else if (token.TokenType == TType.Long)
-                        return (long)token.Value != 0;
+                    if (tk.TokenType == TType.Boolean)
+                        return (bool)tk.Value;
+                    else if (tk.TokenType == TType.Long)
+                        return (long)tk.Value != 0;
                 }
                 else if (name.Equals("Double"))
                 {
-                    if (token.TokenType == TType.Long)
-                        return (double)(long)token.Value;
-                    else if (token.TokenType == TType.ULong)
-                        return (double)(ulong)token.Value;
+                    if (tk.TokenType == TType.Long)
+                        return (double)(long)tk.Value;
+                    else if (tk.TokenType == TType.ULong)
+                        return (double)(ulong)tk.Value;
 #if JSONBIGINT
-                    else if (token.TokenType == TType.BigInt)
-                        return (double)(System.Numerics.BigInteger)token.Value;
+                    else if (tk.TokenType == TType.BigInt)
+                        return (double)(System.Numerics.BigInteger)tk.Value;
 #endif
-                    else if (token.TokenType == TType.Double)
-                        return (double)token.Value;
+                    else if (tk.TokenType == TType.Double)
+                        return (double)tk.Value;
                 }
                 else if (name.Equals("Single"))
                 {
-                    if (token.TokenType == TType.Long)
-                        return (float)(long)token.Value;
-                    else if (token.TokenType == TType.ULong)
-                        return (float)(ulong)token.Value;
+                    if (tk.TokenType == TType.Long)
+                        return (float)(long)tk.Value;
+                    else if (tk.TokenType == TType.ULong)
+                        return (float)(ulong)tk.Value;
 #if JSONBIGINT
-                    else if (token.TokenType == TType.BigInt)
-                        return (float)(System.Numerics.BigInteger)token.Value;
+                    else if (tk.TokenType == TType.BigInt)
+                        return (float)(System.Numerics.BigInteger)tk.Value;
 #endif
-                    else if (token.TokenType == TType.Double)
-                        return (float)(double)token.Value;
+                    else if (tk.TokenType == TType.Double)
+                        return (float)(double)tk.Value;
                 }
                 else if (name.Equals("UInt32"))
                 {
-                    if (token.TokenType == TType.Long && (long)token.Value >= 0)
-                        return (uint)(long)token.Value;
-                    else if (token.TokenType == TType.Double && (double)token.Value >= 0)
-                        return (uint)(double)token.Value;
+                    if (tk.TokenType == TType.Long && (long)tk.Value >= 0)
+                        return (uint)(long)tk.Value;
+                    else if (tk.TokenType == TType.Double && (double)tk.Value >= 0)
+                        return (uint)(double)tk.Value;
                 }
                 else if (name.Equals("UInt64"))
                 {
-                    if (token.TokenType == TType.ULong)
-                        return (ulong)token.Value;
-                    else if (token.TokenType == TType.Long && (long)token.Value >= 0)
-                        return (ulong)(long)token.Value;
-                    else if (token.TokenType == TType.Double && (double)token.Value >= 0)
-                        return (ulong)(double)token.Value;
+                    if (tk.TokenType == TType.ULong)
+                        return (ulong)tk.Value;
+                    else if (tk.TokenType == TType.Long && (long)tk.Value >= 0)
+                        return (ulong)(long)tk.Value;
+                    else if (tk.TokenType == TType.Double && (double)tk.Value >= 0)
+                        return (ulong)(double)tk.Value;
                 }
                 else if (name.Equals("DateTime"))
                 {
-                    if ( token.IsString )       // must be a string
+                    if ( tk.IsString )       // must be a string
                     {
-                        string valuetext = token.Str();     // get string..
-                        if (preprocess != null)
-                            valuetext = preprocess(converttype, valuetext);
-                        if (DateTime.TryParse(valuetext, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
+                        if (process != null)
+                            return process(converttype, (string)tk.Value);
+                        else
                         {
-                            return ret;
+                            if (DateTime.TryParse((string)tk.Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out DateTime ret))
+                            {
+                                return ret;
+                            }
                         }
                     }
                 }
                 else if (name.Equals("Object"))                     // catch all, june 7/6/23 fix
                 {
-                    return token.Value;
+                    return tk.Value;
                 }
-                return new ToObjectError("JSONToObject: Bad Conversion " + token.TokenType + " to " + converttype.Name);
+                return new ToObjectError("JSONToObject: Bad Conversion " + tk.TokenType + " to " + converttype.Name);
             }
         }
         public class ToObjectError
@@ -2565,6 +2641,11 @@ namespace QuickJSON
             public string PropertyName;
             public ToObjectError(string s) { ErrorString = s; PropertyName = ""; }
         };
+        static Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>> CacheOfTypesToMembers = new Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>>();
+        public static void ClearToObjectCache()
+        {
+            CacheOfTypesToMembers = new Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>>();
+        }
     }
 }
 namespace QuickJSON
