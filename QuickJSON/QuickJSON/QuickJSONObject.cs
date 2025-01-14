@@ -92,7 +92,7 @@ namespace QuickJSON
         public string[] PropertyNames() { return Objects.Keys.ToArray(); }
 
         /// <summary> Does the JObject contain property name</summary>
-        public bool Contains(string name) { return Objects.ContainsKey(name); }
+        public override bool Contains(string name) { return Objects.ContainsKey(name); }
 
         /// <summary> Does the JObject contain all the listed properties</summary>
         public bool ContainsAllOfThese(params string[] name) { return Objects.Where(kvp => name.Contains(kvp.Key)).Count() == name.Length; }

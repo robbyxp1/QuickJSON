@@ -31,6 +31,8 @@ namespace QuickJSON
         /// <summary> FromObject: If non null, list of object members to include only</summary>
         public string[] IncludeOnly { get; set; }
 
+//??tbd introduce a flag to say object is ignored only if this flag is set ..
+
         /// <summary> FromObject and ToObject: Constructor to indicate that this member should be ignored completely. </summary>
         public JsonIgnoreAttribute() { }
 
@@ -42,7 +44,7 @@ namespace QuickJSON
             Include
         };
 
-        /// <summary> FromObject: Constructor to indicate which members to enumerate to JSON.  
+        /// <summary> FromObject: Constructor to indicate which members of this class to enumerate to JSON.  
         /// ToObject: the setting is ignored and the member processed as normal
         /// If Ignore, name list are the members which should be excluded. All others will be included
         /// If Include, name list are only the members which will be included, all others will be excluded.
@@ -118,6 +120,15 @@ namespace QuickJSON
             var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r;
+        }
+
+        class AttrControl
+        {
+            public HashSet<string> include;
+            public HashSet<string> ignore;
+            public bool ignoreall;
+            public string rename;
+            public bool ignoreifnull;
         }
 
         /// <summary>
@@ -231,6 +242,47 @@ namespace QuickJSON
                 var allmembers = tt.GetMembers(membersearchflags);
 
                 objectlist.Push(o);
+
+                {
+                    Dictionary<Type, Dictionary<string, AttrControl>> fromlist = new Dictionary<Type, Dictionary<string, AttrControl>>();
+
+                    if (!fromlist.TryGetValue(tt, out Dictionary<string, AttrControl> controldict))
+                    {
+                        controldict = new Dictionary<string, AttrControl>();
+                        fromlist[tt] = controldict;
+
+                        foreach (var mi in allmembers)
+                        {
+                            string attrname = mi.Name;
+
+                            var ca = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                            if (ca.Length > 0)
+                            {
+                                JsonIgnoreAttribute jia = ca[0] as JsonIgnoreAttribute;
+                                if (jia.Ignore != null)
+                                    controldict[attrname] = new AttrControl() { ignore = jia.Ignore.ToHashSet() };
+                                else if (jia.IncludeOnly != null)
+                                    controldict[attrname] = new AttrControl() { include = jia.IncludeOnly.ToHashSet() };
+                                else
+                                    controldict[attrname] = new AttrControl() { ignoreall = true };
+                            }
+                            else
+                                controldict[attrname] = new AttrControl();
+
+                            var rename = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                            if (rename.Length == 1)
+                            {
+                                dynamic attr = rename[0];                                   // dynamic since compiler does not know rename type
+                                controldict[attrname].rename = attr.Names[0];
+                            }
+
+                            if (mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false).Length == 1)
+                                controldict[attrname].ignoreifnull = true;
+                        }
+                    }
+                }
+
+                to be done
 
                 foreach (var mi in allmembers)
                 {

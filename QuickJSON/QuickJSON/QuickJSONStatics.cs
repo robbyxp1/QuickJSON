@@ -588,6 +588,26 @@ namespace QuickJSON
             else
                 return null;
         }
+
+        /// <summary> Read a file and turn it into JSON. Null if can't read file or not json </summary>
+        public static JToken ReadJSONFile(this string filepath, JToken.ParseOptions flags = JToken.ParseOptions.None)
+        {
+            try
+            {
+                string ftext = System.IO.File.ReadAllText(filepath);
+                return JToken.Parse(ftext, flags);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        /// <summary> Read a JSON string, convert it, then turn it back to a string (default verbose)</summary>
+        public static JToken ReadJSONAndConvertBack(this string jsontext, JToken.ParseOptions flags = JToken.ParseOptions.None, bool verbose = true)
+        {
+            JToken tk = JToken.Parse(jsontext, flags);
+            return tk?.ToString(verbose);
+        }
     }
 }
 

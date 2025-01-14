@@ -726,6 +726,9 @@ namespace QuickJSON
         /// </exception>
         public virtual JToken this[object key] { get { return null; } set { throw new NotImplementedException(); } }
 
+        /// <summary> Does the JObject contain property name</summary>
+        public virtual bool Contains(string name) { return false; }
+
         /// <summary> Add to a JArray a JToken thru this class</summary>
         /// <exception cref="System.NotImplementedException">Thrown if used on an non indexed object
         /// </exception>
