@@ -157,6 +157,26 @@ namespace JSONTests
                 Check.That(list[0].RotationDegrees.Z).IsEqualTo(9);
             }
 
+            if (true) // demonstrate removal of unwanted members by the new (sept 23) ignore or include operation
+            {
+                List<ImageEntry> ielist = new List<ImageEntry>
+                {
+                    new ImageEntry("A1","P1",true,new Point3D(1,2,3),new PointF(5,6),new Point3D(7,8,9)),
+                    new ImageEntry("A2", "P2", true, new Point3D(1, 2, 3), new PointF(5, 6), new Point3D(7, 8, 9)),
+                };
+
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+                for (int i = 0; i < 1000; i++)
+                {
+                    JArray json = JToken.FromObjectWithError(ielist, false, membersearchflags: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).Array();
+
+                    Check.That(json[0].Object()["Centre"].Object().Contains("PointF")).IsFalse();
+                }
+                System.Diagnostics.Debug.WriteLine($"FromObject elapsed {sw.ElapsedMilliseconds}");
+            }
+
+
             if (true)
             {
                 List<ImageEntry> ielist = new List<ImageEntry>
