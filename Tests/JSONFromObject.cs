@@ -59,19 +59,25 @@ namespace JSONTests
 
         public class ImageEntry
         {
+            [JsonIgnore(new string[] { null })] // only in default set is it removed
             public bool Enabled { get; set; }
+            [JsonName(new string[] { null, "S1" }, new string[] { "Fred", "Jim" })]     // different renames between null and S1 set
             public string Name { get; set; }                // name given to it, for preselected ones only
             public string ImagePathOrURL { get; set; }      // http:... or c:\ or Resource:<name>
 
-            [JsonIgnoreIfNull]
+            [JsonIgnoreIfNull(new string[] { null })]       // only apply to default set
             public string NotNull { get; set; }
 
-            [JsonIgnore(JsonIgnoreAttribute.Operation.Include, "X", "Y", "Z")]
+            [JsonIgnoreAttribute(null, JsonIgnoreAttribute.Operation.Include, new string[] { "X", "Y", "Z" },
+                "S1", JsonIgnoreAttribute.Operation.Ignore, new string[] { "X" } )]      // default set only, knock out IsEmpty, second set, knock out X
             public Point3D Centre { get; set; }
-            [JsonIgnore(JsonIgnoreAttribute.Operation.Ignore, "IsEmpty")]
+
+            [JsonIgnore(JsonIgnoreAttribute.Operation.Ignore, "IsEmpty")]       // aookues ti default set only
             public PointF Size { get; set; }
-            [JsonIgnore(JsonIgnoreAttribute.Operation.Include, "X", "Y", "Z")]
+
+            [JsonIgnore(JsonIgnoreAttribute.Operation.Include, "X", "Y", "Z")]  // default set only
             public Point3D RotationDegrees { get; set; }
+
             public bool RotateToViewer { get; set; }
             public bool RotateElevation { get; set; }
             public float AlphaFadeScalar { get; set; }
@@ -124,12 +130,15 @@ namespace JSONTests
                 ielist[1].NotNull = "hello";
 
                 JArray json = JToken.FromObjectWithError(ielist, false, membersearchflags: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).Array();
+                System.Diagnostics.Debug.WriteLine($"Json: {json.ToString()}");
 
+                Check.That(json[0].Object().Contains("Enabled")).IsFalse();
+                Check.That(json[0].Object().Contains("Fred")).IsTrue();
+                Check.That(json[0].Object().Contains("Jim")).IsFalse();
                 Check.That(json[0].Object()["Centre"].Object().Contains("PointF")).IsFalse();
                 Check.That(json[0].Object()["Centre"].Object().Contains("X")).IsTrue();
                 Check.That(json[0].Object()["Centre"].Object().Contains("Y")).IsTrue();
                 Check.That(json[0].Object()["Centre"].Object().Contains("Z")).IsTrue();
-                Check.That(json[0].Object()["Size"].Object().Contains("IsEmpty")).IsFalse();
                 Check.That(json[0].Object()["Size"].Object().Contains("IsEmpty")).IsFalse();
                 Check.That(json[0].Object().Contains("NotNull")).IsFalse();
 
@@ -137,6 +146,7 @@ namespace JSONTests
                 Check.That(json[1].Object()["Centre"].Object().Contains("X")).IsTrue();
                 Check.That(json[1].Object()["Centre"].Object().Contains("Y")).IsTrue();
                 Check.That(json[1].Object()["Centre"].Object().Contains("Z")).IsTrue();
+
                 Check.That(json[1].Object()["Size"].Object().Contains("IsEmpty")).IsFalse();
                 Check.That(json[1].Object()["Size"].Object().Contains("IsEmpty")).IsFalse();
                 Check.That(json[1].Object().Contains("NotNull")).IsTrue();
@@ -155,6 +165,25 @@ namespace JSONTests
                 Check.That(list[0].RotationDegrees.X).IsEqualTo(7);
                 Check.That(list[0].RotationDegrees.Y).IsEqualTo(8);
                 Check.That(list[0].RotationDegrees.Z).IsEqualTo(9);
+
+                json = JToken.FromObjectWithError(ielist, false, membersearchflags: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance,setname:"S1").Array();
+                System.Diagnostics.Debug.WriteLine($"Json: {json.ToString()}");
+
+                Check.That(json[0].Object().Contains("Enabled")).IsTrue();
+                Check.That(json[0].Object().Contains("Jim")).IsTrue();
+                Check.That(json[0].Object().Contains("NotNull")).IsTrue();      // does not apply to S1
+                Check.That(json[1].Object().Contains("NotNull")).IsTrue();      // does not apply to S1
+
+                Check.That(json[0].Object()["Centre"].Object().Contains("X")).IsFalse();        // X is knocked out
+                Check.That(json[0].Object()["Centre"].Object().Contains("Y")).IsTrue();
+                Check.That(json[0].Object()["Centre"].Object().Contains("Z")).IsTrue();
+                Check.That(json[0].Object()["Size"].Object().Contains("IsEmpty")).IsTrue();
+
+                Check.That(json[0].Object()["RotationDegrees"].Object().Contains("X")).IsTrue();        // does not apply to set S1
+                Check.That(json[0].Object()["RotationDegrees"].Object().Contains("Y")).IsTrue();
+                Check.That(json[0].Object()["RotationDegrees"].Object().Contains("Z")).IsTrue();
+                Check.That(json[0].Object()["RotationDegrees"].Object().Contains("PointF")).IsTrue();
+
             }
 
             if (true)
@@ -173,7 +202,7 @@ namespace JSONTests
                 Check.That(json[0].Object().Contains("ImagePathOrURL")).IsTrue();
                 Check.That(json[0].Object().Contains("NotNull")).IsFalse();
 
-                Check.That(json[1].Object().Contains("Name")).IsTrue();
+                Check.That(json[1].Object().Contains("Fred")).IsTrue();
                 Check.That(json[1].Object().Contains("ImagePathOrURL")).IsFalse();
                 Check.That(json[1].Object().Contains("NotNull")).IsTrue();
 

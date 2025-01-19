@@ -104,8 +104,9 @@ namespace JSONTests
         }
         public class IgnoreTest
         {
-            [JsonIgnore()]
+            [JsonIgnore(new string[] { null })]
             public string one;
+            [JsonIgnore("S1")]
             public string two;
             public int three;
             public bool four;
@@ -248,10 +249,17 @@ namespace JSONTests
 
             IgnoreTest decoded = decode.ToObject<IgnoreTest>(true);
             Check.That(decoded).IsNotNull();
-            Check.That(decoded.one == null);
-            Check.That(decoded.two == "two");
-            Check.That(decoded.three == 30);
-            Check.That(decoded.four == true);
+            Check.That(decoded.one == null).IsTrue();        // one is ignored
+            Check.That(decoded.two == "two").IsTrue();
+            Check.That(decoded.three == 30).IsTrue();
+            Check.That(decoded.four == true).IsTrue();
+            
+            decoded = decode.ToObject<IgnoreTest>(true,setname:"S1");
+            Check.That(decoded).IsNotNull();
+            Check.That(decoded.one == "one").IsTrue();
+            Check.That(decoded.two == null).IsTrue();        // two is ignored
+            Check.That(decoded.three == 30).IsTrue();
+            Check.That(decoded.four == true).IsTrue();
         }
 
         [Test]

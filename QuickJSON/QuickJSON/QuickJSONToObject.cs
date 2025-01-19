@@ -18,6 +18,7 @@
 using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static QuickJSON.JToken;
 
 namespace QuickJSON
@@ -42,13 +43,14 @@ namespace QuickJSON
         /// <param name="token">JToken to convert from</param>
         /// <param name="ignoretypeerrors">Ignore any errors in type between the JToken type and the member type.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
+        /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
         /// <returns>New object T containing fields filled by JToken, or default(T) on error. </returns>
-        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, Func<Type, string, object> process = null)
+        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, Func<Type, string, object> process = null, string setname = null)
         {
             Type tt = typeof(T);
             try
             {
-                Object ret = token.ToObject(tt, ignoretypeerrors,process:process);        // paranoia, since there are a lot of dynamics, trap any exceptions
+                Object ret = token.ToObject(tt, ignoretypeerrors,process:process,setname:setname);        // paranoia, since there are a lot of dynamics, trap any exceptions
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -72,16 +74,19 @@ namespace QuickJSON
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
+        /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
 
         public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors, 
                                     System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
                                     Object initialobject = null,
-                                    Func<Type, string, object> process = null)
+                                    Func<Type, string, object> process = null,
+                                    string setname = null
+                                    )
         {
             try
             {
-                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process);
+                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process, setname);
             }
             catch (Exception ex)
             {
@@ -98,6 +103,7 @@ namespace QuickJSON
         /// Use the default plus DeclaredOnly for only members of the top class only </param>
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
+        /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
         /// <exception cref="System.Exception"> Generic exception</exception>
         /// <exception cref="System.InvalidCastException"> If a type failure occurs.  Other excepections could also occur.
@@ -105,7 +111,8 @@ namespace QuickJSON
         public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors,
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
             Object initialobject = null,
-            Func<Type, string, object> process = null
+            Func<Type, string, object> process = null,
+            string setname = null
             )
         {
             if (token == null)
@@ -218,63 +225,91 @@ namespace QuickJSON
 
                     // see if we have already dealt with this converttype
 
-                    Dictionary<string, System.Reflection.MemberInfo> NamesToMI;
+                    Dictionary<string, System.Reflection.MemberInfo> namestosettings;
 
                     lock ( CacheOfTypesToMembers)        // thread lock
                     {
                         // try and find previously computed info
 
-                        if (!CacheOfTypesToMembers.TryGetValue(converttype, out NamesToMI))
+                        var key = new Tuple<string, Type>(setname, converttype);
+
+                        if (!CacheOfTypesToMembers.TryGetValue(key, out namestosettings))
                         {
-                           // System.Diagnostics.Trace.WriteLine($"QuickJSON ToObject Making new name cache for {converttype.Name}");
+                           // System.Diagnostics.Debug.WriteLine($"Created cached control {key}");
 
-                            // if not, compute
+                            namestosettings = new Dictionary<string, System.Reflection.MemberInfo>();     // name -> MI, or name->Null if ignored
+                            CacheOfTypesToMembers[key] = namestosettings;
 
-                            NamesToMI = new Dictionary<string, System.Reflection.MemberInfo>();     // name -> MI, or name->Null if ignored
+                            var list = new List<System.Reflection.MemberInfo>();
+                            list.AddRange(converttype.GetFields(membersearchflags));        // get field list..
+                            list.AddRange(converttype.GetProperties(membersearchflags));        // get property list
 
-                            System.Reflection.MemberInfo[] fi = converttype.GetFields(membersearchflags);        // get field list..
-                            foreach (var mi in fi)
+                            foreach (var mi in list)
                             {
-                                // compute if to be ignored
-                                var ignoreattr = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                                bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
+                                bool includeit = true;
 
-                                var attrlist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                if (attrlist.Length == 1)       // if we have an attribute of this
+                                // compute if to be ignored
+                                var calist = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                if (calist.Length == 1)
                                 {
-                                    var atlist = (JsonNameAttribute)attrlist[0];
-                                    foreach (var x in atlist.Names) // add all names and point to mi
-                                        NamesToMI[x] = includeit ? mi : null;
+                                    JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
+
+                                    if (jia.Setting == null)       // null, means just ignore all time
+                                    {
+                                        includeit = false;
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < jia.Setting.Length; i++)        // try and find the set, if found
+                                        {
+                                            if (jia.Setting[i].Set.EqualsI(setname))        // found set, as long as its not an ignore/include list..
+                                            {
+                                                if (jia.Setting[i].Ignore == null && jia.Setting[i].IncludeOnly == null)
+                                                    includeit = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                if (renamelist.Length == 1)
+                                {
+                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;          // get name attribute
+                                    if (na.Sets == null)                                                // no sets, applies to all, add as all names lists accepted
+                                    {
+                                        foreach (var x in na.Names)                                     // add all names and point to mi
+                                            namestosettings[x] = includeit ? mi : null;
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < na.Sets.Length; i++)  // find set, if not found, no change, else add name to one accepted for this member
+                                        {
+                                            if (na.Sets[i] == setname)
+                                            {
+                                                namestosettings[na.Names[i]] = includeit ? mi : null;     // we don't break, we can add multiple names with the sets matching more than once
+                                                System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
+                                            }
+                                        }
+                                    }
                                 }
                                 else
-                                    NamesToMI[mi.Name] = includeit ? mi : null;    // else add the object name
-                            }
-
-                            System.Reflection.MemberInfo[] pi = converttype.GetProperties(membersearchflags);   // add properties to list
-                            foreach (var pmi in pi)
-                            {
-                                // compute if to be ignored
-                                var ignoreattr = pmi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                                bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
-
-                                var attrlist = pmi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                if (attrlist.Length == 1)       // if we have an attribute of this
                                 {
-                                    var atlist = (JsonNameAttribute)attrlist[0];
-                                    foreach (var x in atlist.Names) // add all names and point to mi
-                                        NamesToMI[x] = includeit ? pmi : null;
+                                    namestosettings[mi.Name] = includeit ? mi : null;    // else add the object name
+                                    System.Diagnostics.Debug.WriteLine($"ToObjectType {mi.Name} {includeit}");
                                 }
-                                else
-                                    NamesToMI[pmi.Name] = includeit ? pmi : null;      // no custom attr, just add the object name
                             }
-
-                            CacheOfTypesToMembers[converttype] = NamesToMI;
                         }
+                        else
+                        {
+                         //   System.Diagnostics.Debug.WriteLine($"Lookup cached control {key}");
+                        }
+
                     }
 
                     foreach (var kvp in (JObject)token)
                     {
-                        if ( NamesToMI.TryGetValue(kvp.Key, out System.Reflection.MemberInfo mi))       // if can find
+                        if ( namestosettings.TryGetValue(kvp.Key, out System.Reflection.MemberInfo mi))       // if can find
                         {
                             if (mi!=null)                                   // ignore any ones with null as its member as its an ignored value
                             {
@@ -596,12 +631,12 @@ namespace QuickJSON
 
 
         // cache
-        static Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>> CacheOfTypesToMembers = new Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>>();
+        static Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>> CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>>();
 
         /// <summary> Clear ToObject convert cache </summary>
         public static void ClearToObjectCache()
         {
-            CacheOfTypesToMembers = new Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>>();
+            CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>>();
         }
 
     }

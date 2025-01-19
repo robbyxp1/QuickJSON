@@ -308,6 +308,18 @@ namespace QuickJSON.Utils
         {
             return "\"" + obj.Replace("\"", "\\\"") + "\"";
         }
+
+        /// <summary>
+        /// Equals invariant. 
+        /// Both A and B can be null, if both are null its true.  If B is null only, its false as per Equals
+        /// </summary>
+        /// <param name="a">this</param>
+        /// <param name="b">string</param>
+        /// <returns></returns>
+        public static bool EqualsI(this string a, string b)
+        {
+            return a==null && b==null ? true : a != null ? a.Equals(b, StringComparison.InvariantCulture) : false;
+        }
     }
 }
 

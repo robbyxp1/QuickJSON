@@ -16,64 +16,10 @@ using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mime;
 
 namespace QuickJSON
 {
-    /// <summary>
-    /// Ignore attribute. Attach to an member of a class to say don't serialise this item or 
-    /// to exclude certain members or to only include specific members
-    /// Applicable to FromObject and ToObject
-    /// </summary>
-    public sealed class JsonIgnoreAttribute : Attribute 
-    {
-        /// <summary> FromObject: If non null, list of object members to ignore completely</summary>
-        public string[] Ignore { get; set; }
-        /// <summary> FromObject: If non null, list of object members to include only</summary>
-        public string[] IncludeOnly { get; set; }
-
-//??tbd introduce a flag to say object is ignored only if this flag is set ..
-
-        /// <summary> FromObject and ToObject: Constructor to indicate that this member should be ignored completely. </summary>
-        public JsonIgnoreAttribute() { }
-
-        /// <summary> Options for FromObject only. </summary>
-        public enum Operation {
-            /// <summary> Use ignore to say the list is a set of members to ignore </summary>
-            Ignore,
-            /// <summary> Use include to say the list is a set of members only to include </summary>
-            Include
-        };
-
-        /// <summary> FromObject: Constructor to indicate which members of this class to enumerate to JSON.  
-        /// ToObject: the setting is ignored and the member processed as normal
-        /// If Ignore, name list are the members which should be excluded. All others will be included
-        /// If Include, name list are only the members which will be included, all others will be excluded.
-        /// </summary>
-        public JsonIgnoreAttribute(Operation ignoreorinclude, params string[] names) { if (ignoreorinclude==Operation.Include) IncludeOnly = names; else Ignore = names; }
-    }
-
-    /// <summary>
-    /// Name attribute. Attach to an member of a class to indicate an alternate name to use in the JSON structure from its c# name.
-    /// Applicable to FromObject and ToObject.  ToObject supports multiple names (any name in JSON will match this entry), FromObject only one.
-    /// </summary>
-    public sealed class JsonNameAttribute : Attribute
-    {
-        /// <summary> List of names for this attribute </summary>
-        public string[] Names { get; set; }
-        /// <summary> Constructor with name list </summary>
-        public JsonNameAttribute(params string[] names) { Names = names; }
-
-    }
-    /// <summary>
-    /// Attach to a member to indicate if the value of it is null, don't add it to JSON.
-    /// FromObject only
-    /// </summary>
-    public sealed class JsonIgnoreIfNullAttribute : Attribute
-    {
-        /// <summary> Constructor </summary>
-        public JsonIgnoreIfNullAttribute() {}
-    }
-
     public partial class JToken
     {
         /// <summary> Convert Object to JToken tree 
@@ -93,13 +39,14 @@ namespace QuickJSON
         /// <param name="maxrecursiondepth">Maximum depth to recurse through the objects heirarchy</param>
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
+        /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
         /// <returns>Null if can't convert (error detected) or JToken tree</returns>
         public static JToken FromObject(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false)
+            bool ignoreobjectpropertyifnull = false, string setname = null)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull, setname);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r.IsInError ? null : r;
         }
@@ -111,24 +58,25 @@ namespace QuickJSON
         /// <param name="maxrecursiondepth">Maximum depth to recurse through the objects heirarchy</param>
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
+        /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
         /// <returns>JToken error type if can't convert (check with IsInError, value has error reason) or JToken tree</returns>
         public static JToken FromObjectWithError(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false)
+            bool ignoreobjectpropertyifnull = false, string setname = null)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull,setname);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r;
         }
 
         class AttrControl
         {
-            public HashSet<string> include;
-            public HashSet<string> ignore;
-            public bool ignoreall;
-            public string rename;
-            public bool ignoreifnull;
+            public string Name;             // name to call it
+            public HashSet<string> IncludeSet;
+            public HashSet<string> IgnoreSet;
+            public bool IgnoreAll;
+            public bool IgnoreIfNull;
         }
 
         /// <summary>
@@ -144,13 +92,15 @@ namespace QuickJSON
         /// <param name="memberignore">which members of a class to ignore, null for none</param>
         /// <param name="memberinclude">which members of a class to include only, null for all, else must be in list</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
+        /// <param name="setname">Define set of JSON attributes to apply</param>
         /// <returns></returns>
         private static JToken FromObjectInt(Object o, bool ignoreunserialisable, 
                         Type[] ignoredtypes, Stack<Object> objectlist, 
                         int lvl, int maxrecursiondepth, 
                         System.Reflection.BindingFlags membersearchflags,
                         HashSet<string> memberignore, HashSet<string> memberinclude,
-                        bool ignoreobjectpropertyifnull
+                        bool ignoreobjectpropertyifnull,
+                        string setname
                         )
         {
             //System.Diagnostics.Debug.WriteLine(lvl + "From Object on " + o.GetType().Name);
@@ -179,7 +129,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IDictionary");
                     }
 
-                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull);
+                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull,setname);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -219,7 +169,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IEnumerable");
                     }
 
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull);
+                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull, setname);
 
                     if (inner.IsInError)      // used as an error type
                     {
@@ -243,64 +193,122 @@ namespace QuickJSON
 
                 objectlist.Push(o);
 
+                Dictionary<string, AttrControl> namestosettings = null;
+
+                lock (CacheOfTypesFromMembers)        // thread lock
                 {
-                    Dictionary<Type, Dictionary<string, AttrControl>> fromlist = new Dictionary<Type, Dictionary<string, AttrControl>>();
+                    // try and find previously computed info
 
-                    if (!fromlist.TryGetValue(tt, out Dictionary<string, AttrControl> controldict))
+                    var key = new Tuple<string, Type>(setname, tt);
+
+                    if (!CacheOfTypesFromMembers.TryGetValue(key, out namestosettings))
                     {
-                        controldict = new Dictionary<string, AttrControl>();
-                        fromlist[tt] = controldict;
+                       // System.Diagnostics.Debug.WriteLine($"Created cached control {key}");
 
+                        namestosettings = new Dictionary<string, AttrControl>();
+                        CacheOfTypesFromMembers[key] = namestosettings;
+
+                        // we go thru all members and pick up the control settings for each one
                         foreach (var mi in allmembers)
                         {
-                            string attrname = mi.Name;
+                            // only props/fields
 
-                            var ca = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                            if (ca.Length > 0)
+                            if (mi.MemberType == System.Reflection.MemberTypes.Property || mi.MemberType == System.Reflection.MemberTypes.Field)
                             {
-                                JsonIgnoreAttribute jia = ca[0] as JsonIgnoreAttribute;
-                                if (jia.Ignore != null)
-                                    controldict[attrname] = new AttrControl() { ignore = jia.Ignore.ToHashSet() };
-                                else if (jia.IncludeOnly != null)
-                                    controldict[attrname] = new AttrControl() { include = jia.IncludeOnly.ToHashSet() };
-                                else
-                                    controldict[attrname] = new AttrControl() { ignoreall = true };
-                            }
-                            else
-                                controldict[attrname] = new AttrControl();
+                                string attrname = mi.Name;
+                                var ac = new AttrControl() { Name = attrname }; 
+                                namestosettings[attrname] = ac;
 
-                            var rename = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                            if (rename.Length == 1)
-                            {
-                                dynamic attr = rename[0];                                   // dynamic since compiler does not know rename type
-                                controldict[attrname].rename = attr.Names[0];
-                            }
+                                // check on json ignore
+                                var calist = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                if ( calist.Length == 1)
+                                { 
+                                    JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
 
-                            if (mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false).Length == 1)
-                                controldict[attrname].ignoreifnull = true;
+                                    if (jia.Setting == null)       // null, means just ignore all time
+                                    {
+                                        ac.IgnoreAll = true;
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < jia.Setting.Length; i++)
+                                        {
+                                            if (jia.Setting[i].Set.EqualsI(setname))  // else we match on set name
+                                            {
+                                                if (jia.Setting[i].Ignore != null)
+                                                    ac.IgnoreSet = jia.Setting[i].Ignore.ToHashSet();
+                                                else if (jia.Setting[i].IncludeOnly != null)
+                                                    ac.IncludeSet = jia.Setting[i].IncludeOnly.ToHashSet();
+                                                else
+                                                    ac.IgnoreAll = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // check on name
+                                var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                if ( renamelist.Length == 1)
+                                { 
+                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;          // get name attribute
+                                    if (na.Sets == null)                                                // no sets, use entry 0 as the name
+                                    {
+                                        ac.Name = na.Names[0];
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < na.Sets.Length; i++)        // find set, if not found, no change, else first one gives the name
+                                        {
+                                            if (na.Sets[i].EqualsI(setname))
+                                            {
+                                                ac.Name = na.Names[i];
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // check on null attribute output flag
+                                var ignorenulllist = mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false);
+                                if (ignorenulllist.Length == 1)
+                                {
+                                    JsonIgnoreIfNullAttribute iin = ignorenulllist[0] as JsonIgnoreIfNullAttribute;
+                                    if (iin.Sets == null)
+                                    {
+                                        ac.IgnoreIfNull = true;
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < iin.Sets.Length; i++)  // find set, if not found, not applicable. Else its ignore if null
+                                        {
+                                            if (iin.Sets[i].EqualsI(setname))
+                                            {
+                                                ac.IgnoreIfNull = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                System.Diagnostics.Debug.WriteLine($"FromObjectType `{setname}`:{tt.Name} attr {attrname} -> {ac.Name} : ignoreall {ac.IgnoreAll} ignoreifnull {ac.IgnoreIfNull} incl {ac.IncludeSet != null} ignore {ac.IgnoreSet != null}");
+                            }
                         }
                     }
-                }
+                    else
+                    {
+                       // System.Diagnostics.Debug.WriteLine($"Lookup cached control {key}");
+                    }
 
-                to be done
+                }
 
                 foreach (var mi in allmembers)
                 {
-                    string attrname = mi.Name;
-
-                    // check if these are set to see if the attr name has been removed by either include list or ignore list
-
-                    if ( (memberinclude != null && !memberinclude.Contains(attrname)) ||
-                            ( memberignore != null && memberignore.Contains(attrname)))
-                    {
-                        continue;
-                    }
-
                     // pick up type 
 
-                    Type innertype = null;
+                    Type innertype;
 
-                    if (mi.MemberType == System.Reflection.MemberTypes.Property)
+                    if (mi.MemberType == System.Reflection.MemberTypes.Property)        // only properties  and fields are allowed thru
                     {
                         innertype = ((System.Reflection.PropertyInfo)mi).PropertyType;
                     }
@@ -312,38 +320,32 @@ namespace QuickJSON
                     else
                         continue;       // not a prop/field
 
+                    // check name is not barred
+
+                    string attrname = mi.Name;
+
+                    // check if these are set to see if the attr name has been removed by either include list or ignore list
+                    // passed into this level to knock out members in here
+
+                    if ( (memberinclude != null && !memberinclude.Contains(attrname)) ||
+                            ( memberignore != null && memberignore.Contains(attrname)))
+                    {
+                        continue;
+                    }
+
+
                     // is it ignored?
 
                     if (ignoredtypes != null && Array.IndexOf(ignoredtypes, innertype) >= 0)
                         continue;
 
-                    // pick up JSONIgnoreAttribute and see if its members are empty (ignore all) or have an include/ignore list
+                    // pick up control for this attribute
+                    AttrControl actrl = namestosettings[attrname];
 
-                    HashSet<string> ignorelist = null;
-                    HashSet<string> includeonly = null;
+                    System.Diagnostics.Debug.WriteLine($"Member {mi.Name} {mi.MemberType} name {actrl.Name} ignoreall {actrl.IgnoreAll}");
 
-                    var ca = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                    if (ca.Length > 0)                                             
-                    {
-                        JsonIgnoreAttribute jia = ca[0] as JsonIgnoreAttribute;
-                        if (jia.Ignore != null)
-                            ignorelist = jia.Ignore.ToHashSet();
-                        else if (jia.IncludeOnly != null)
-                            includeonly = jia.IncludeOnly.ToHashSet();
-                        else
-                            continue;   // ignore all with no lists
-                    }
-
-                    // see if rename is active
-
-                    var rename = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                    if (rename.Length == 1)                                         
-                    {
-                        dynamic attr = rename[0];                                   // dynamic since compiler does not know rename type
-                        attrname = attr.Names[0];                                   // only first entry is used for FromObject
-                    }
-
-                    //System.Diagnostics.Debug.WriteLine("Member " + mi.Name + " " + mi.MemberType + " attrname " + attrname);
+                    if (actrl.IgnoreAll)        // ignore all,stop
+                        continue;
 
                     // get the value
 
@@ -368,7 +370,7 @@ namespace QuickJSON
                             return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
 
-                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, ignorelist, includeonly, ignoreobjectpropertyifnull);     // may return End Object if not serializable
+                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, actrl.IgnoreSet, actrl.IncludeSet, ignoreobjectpropertyifnull, setname );
 
                         if (token.IsInError)
                         {
@@ -379,15 +381,15 @@ namespace QuickJSON
                             }
                         }
                         else
-                            outobj[attrname] = token;
+                            outobj[actrl.Name] = token;
                     }
                     else
                     {
                         // see if null exclude is active
-                        bool ignoreifnull = ignoreobjectpropertyifnull || mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false).Length == 1;
+                        bool ignoreifnull = ignoreobjectpropertyifnull || actrl.IgnoreIfNull;
 
                         if ( ignoreifnull == false)         
-                            outobj[attrname] = JToken.Null();        // its null so its a JNull
+                            outobj[actrl.Name] = JToken.Null();        // its null so its a JNull
                     }
                 }
 
@@ -402,7 +404,13 @@ namespace QuickJSON
             }
         }
 
+        static Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>> CacheOfTypesFromMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
 
+        /// <summary> Clear ToObject convert cache </summary>
+        public static void ClearFromObjectCache()
+        {
+            CacheOfTypesFromMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
+        }
     }
 }
 
