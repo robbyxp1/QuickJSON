@@ -196,7 +196,7 @@ namespace JSONTests
 
                 Stopwatch sw = new Stopwatch();
                 sw.Start();
-                for (int i = 0; i < 1000; i++)
+                for (int i = 0; i < 1000; i++)      // measured 31ms/1000, 2907/100000, 8345/300000 20/1/25, previously it was 35922/300000
                 {
                     JArray json = JToken.FromObjectWithError(ielist, false, membersearchflags: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).Array();
 

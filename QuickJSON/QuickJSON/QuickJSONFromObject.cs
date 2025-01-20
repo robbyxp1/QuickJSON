@@ -16,7 +16,6 @@ using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Mime;
 
 namespace QuickJSON
 {
@@ -72,11 +71,11 @@ namespace QuickJSON
 
         class AttrControl
         {
-            public string Name;             // name to call it
-            public HashSet<string> IncludeSet;
-            public HashSet<string> IgnoreSet;
-            public bool IgnoreAll;
-            public bool IgnoreIfNull;
+            public string Name;             // name to call the output
+            public bool IgnoreMember;          // ignore member always
+            public bool IgnoreMemberIfNull;     // ignore member if null
+            public HashSet<string> IncludeSet;  // if set, sets the memberinclude variable for the object below
+            public HashSet<string> IgnoreSet;   // if set, sets the memberignore variable for the object below
         }
 
         /// <summary>
@@ -225,9 +224,9 @@ namespace QuickJSON
                                 { 
                                     JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
 
-                                    if (jia.Setting == null)       // null, means just ignore all time
+                                    if (jia.Setting == null)       // null, means all sets
                                     {
-                                        ac.IgnoreAll = true;
+                                        ac.IgnoreMember = true;
                                     }
                                     else
                                     {
@@ -240,7 +239,7 @@ namespace QuickJSON
                                                 else if (jia.Setting[i].IncludeOnly != null)
                                                     ac.IncludeSet = jia.Setting[i].IncludeOnly.ToHashSet();
                                                 else
-                                                    ac.IgnoreAll = true;
+                                                    ac.IgnoreMember = true;
                                                 break;
                                             }
                                         }
@@ -251,8 +250,8 @@ namespace QuickJSON
                                 var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
                                 if ( renamelist.Length == 1)
                                 { 
-                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;          // get name attribute
-                                    if (na.Sets == null)                                                // no sets, use entry 0 as the name
+                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;         
+                                    if (na.Sets == null)        // null, means all sets
                                     {
                                         ac.Name = na.Names[0];
                                     }
@@ -274,9 +273,9 @@ namespace QuickJSON
                                 if (ignorenulllist.Length == 1)
                                 {
                                     JsonIgnoreIfNullAttribute iin = ignorenulllist[0] as JsonIgnoreIfNullAttribute;
-                                    if (iin.Sets == null)
+                                    if (iin.Sets == null)       // null, means all sets
                                     {
-                                        ac.IgnoreIfNull = true;
+                                        ac.IgnoreMemberIfNull = true;
                                     }
                                     else
                                     {
@@ -284,14 +283,14 @@ namespace QuickJSON
                                         {
                                             if (iin.Sets[i].EqualsI(setname))
                                             {
-                                                ac.IgnoreIfNull = true;
+                                                ac.IgnoreMemberIfNull = true;
                                                 break;
                                             }
                                         }
                                     }
                                 }
 
-                                System.Diagnostics.Debug.WriteLine($"FromObjectType `{setname}`:{tt.Name} attr {attrname} -> {ac.Name} : ignoreall {ac.IgnoreAll} ignoreifnull {ac.IgnoreIfNull} incl {ac.IncludeSet != null} ignore {ac.IgnoreSet != null}");
+                                //System.Diagnostics.Debug.WriteLine($"FromObjectType `{setname}`:{tt.Name} attr {attrname} -> {ac.Name} : ignoreall {ac.IgnoreAll} ignoreifnull {ac.IgnoreIfNull} incl {ac.IncludeSet != null} ignore {ac.IgnoreSet != null}");
                             }
                         }
                     }
@@ -333,8 +332,7 @@ namespace QuickJSON
                         continue;
                     }
 
-
-                    // is it ignored?
+                    // is it an ignored type?
 
                     if (ignoredtypes != null && Array.IndexOf(ignoredtypes, innertype) >= 0)
                         continue;
@@ -342,9 +340,9 @@ namespace QuickJSON
                     // pick up control for this attribute
                     AttrControl actrl = namestosettings[attrname];
 
-                    System.Diagnostics.Debug.WriteLine($"Member {mi.Name} {mi.MemberType} name {actrl.Name} ignoreall {actrl.IgnoreAll}");
+                    //System.Diagnostics.Debug.WriteLine($"Member {mi.Name} {mi.MemberType} name {actrl.Name} ignoreall {actrl.IgnoreAll}");
 
-                    if (actrl.IgnoreAll)        // ignore all,stop
+                    if (actrl.IgnoreMember)        // ignore all,stop
                         continue;
 
                     // get the value
@@ -386,7 +384,7 @@ namespace QuickJSON
                     else
                     {
                         // see if null exclude is active
-                        bool ignoreifnull = ignoreobjectpropertyifnull || actrl.IgnoreIfNull;
+                        bool ignoreifnull = ignoreobjectpropertyifnull || actrl.IgnoreMemberIfNull;
 
                         if ( ignoreifnull == false)         
                             outobj[actrl.Name] = JToken.Null();        // its null so its a JNull

@@ -48,8 +48,7 @@ namespace QuickJSON
         public JsonIgnoreAttribute() { Setting = null; }
 
         /// <summary> FromObject and ToObject: Constructor to indicate that this member should be ignored completely for this list of sets
-        /// For other sets the member is not ignored
-        /// </summary>
+        /// For other sets the member is not ignored</summary>
         public JsonIgnoreAttribute(params string[] setnames) {
             Setting = new SetSetting[setnames.Length];
             for (int i = 0; i < setnames.Length; i++) 

@@ -18,7 +18,6 @@
 using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using static QuickJSON.JToken;
 
 namespace QuickJSON
@@ -253,8 +252,7 @@ namespace QuickJSON
                                 if (calist.Length == 1)
                                 {
                                     JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
-
-                                    if (jia.Setting == null)       // null, means just ignore all time
+                                    if (jia.Setting == null)       // null, means all sets
                                     {
                                         includeit = false;
                                     }
@@ -275,11 +273,11 @@ namespace QuickJSON
                                 var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
                                 if (renamelist.Length == 1)
                                 {
-                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;          // get name attribute
-                                    if (na.Sets == null)                                                // no sets, applies to all, add as all names lists accepted
+                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;          
+                                    if (na.Sets == null)        // null, means all sets
                                     {
-                                        foreach (var x in na.Names)                                     // add all names and point to mi
-                                            namestosettings[x] = includeit ? mi : null;
+                                        foreach (var x in na.Names)                                     
+                                            namestosettings[x] = includeit ? mi : null; // add all names and point to mi
                                     }
                                     else
                                     {
@@ -288,15 +286,15 @@ namespace QuickJSON
                                             if (na.Sets[i] == setname)
                                             {
                                                 namestosettings[na.Names[i]] = includeit ? mi : null;     // we don't break, we can add multiple names with the sets matching more than once
-                                                System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
+                                                //System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
                                             }
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    namestosettings[mi.Name] = includeit ? mi : null;    // else add the object name
-                                    System.Diagnostics.Debug.WriteLine($"ToObjectType {mi.Name} {includeit}");
+                                    namestosettings[mi.Name] = includeit ? mi : null;    // add the object name
+                                    //System.Diagnostics.Debug.WriteLine($"ToObjectType {mi.Name} {includeit}");
                                 }
                             }
                         }
