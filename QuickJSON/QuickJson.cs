@@ -1,3 +1,4 @@
+#define ENABLEINLINE
 using QuickJSON.Utils;
 using System;
 using System.Collections;
@@ -523,6 +524,7 @@ namespace QuickJSON
         #endregion
         #region Operators and functions
         public virtual JToken this[object key] { get { return null; } set { throw new NotImplementedException(); } }
+        public virtual bool Contains(string name) { return false; }
         public virtual void Add(JToken value) { throw new NotImplementedException(); }
         public virtual void Add<T>(T value) { throw new NotImplementedException(); }
         public virtual void AddRange(IEnumerable<JToken> o) { throw new NotImplementedException(); }
@@ -627,6 +629,67 @@ namespace QuickJSON
         internal override IEnumerator<JToken> GetSubClassTokenEnumerator() { return Elements.GetEnumerator(); }
         internal override IEnumerator GetSubClassEnumerator() { return Elements.GetEnumerator(); }
         private List<JToken> Elements { get; set; }
+    }
+}
+namespace QuickJSON
+{
+    public sealed class JsonIgnoreAttribute : Attribute 
+    {
+        public class SetSetting
+        {
+            public string Set { get; set; }
+            public string[] Ignore { get; set; }
+            public string[] IncludeOnly { get; set; }
+            public SetSetting() { }
+            public SetSetting(string set ) { Set = set; } 
+            public SetSetting(string set, Operation ignoreorinclude, string[] names)
+            {
+                Set = set;
+                if (ignoreorinclude == Operation.Include) IncludeOnly = names; else Ignore = names;
+            }
+        }
+        public SetSetting[] Setting { get; set; }
+        public JsonIgnoreAttribute() { Setting = null; }
+        public JsonIgnoreAttribute(params string[] setnames) {
+            Setting = new SetSetting[setnames.Length];
+            for (int i = 0; i < setnames.Length; i++) 
+                Setting[i] = new SetSetting(setnames[i]);
+        }
+        public enum Operation {
+            Ignore,
+            Include
+        };
+        public JsonIgnoreAttribute(Operation ignoreorinclude, params string[] names) {
+            Setting = new SetSetting[1] { new SetSetting(null,ignoreorinclude, names) };
+        }
+        public JsonIgnoreAttribute(string setname1, Operation ignoreorinclude1, string[] names1,
+            string setname2, Operation ignoreorinclude2, string[] names2)
+        {
+            Setting = new SetSetting[2] { new SetSetting(setname1, ignoreorinclude1, names1),
+                new SetSetting(setname2, ignoreorinclude2, names2)
+            };
+        }
+        public JsonIgnoreAttribute(string setname1, Operation ignoreorinclude1, string[] names1,
+            string setname2, Operation ignoreorinclude2, string[] names2,
+            string setname3, Operation ignoreorinclude3, string[] names3)
+        {
+            Setting = new SetSetting[3] { new SetSetting(setname1, ignoreorinclude1, names1),
+                new SetSetting(setname2, ignoreorinclude2, names2), new SetSetting(setname3, ignoreorinclude3, names3)
+            };
+        }
+    }
+public sealed class JsonNameAttribute : Attribute
+    {
+        public string[] Sets { get; set; }
+        public string[] Names { get; set; }
+        public JsonNameAttribute(params string[] names) { Names = names; Sets = null; }
+        public JsonNameAttribute(string[] sets, string[] names) { Names = names; Sets = sets; System.Diagnostics.Trace.Assert(Names.Length == Sets.Length); }
+    }
+    public sealed class JsonIgnoreIfNullAttribute : Attribute
+    {
+        public string[] Sets { get; set; }
+        public JsonIgnoreIfNullAttribute() { Sets = null; }
+        public JsonIgnoreIfNullAttribute(string[] setnames) { Sets = setnames; }
     }
 }
 namespace QuickJSON
@@ -747,26 +810,6 @@ namespace QuickJSON
 }
 namespace QuickJSON
 {
-    public sealed class JsonIgnoreAttribute : Attribute 
-    {
-        public string[] Ignore { get; set; }
-        public string[] IncludeOnly { get; set; }
-        public JsonIgnoreAttribute() { }
-        public enum Operation {
-            Ignore,
-            Include
-        };
-        public JsonIgnoreAttribute(Operation ignoreorinclude, params string[] names) { if (ignoreorinclude==Operation.Include) IncludeOnly = names; else Ignore = names; }
-    }
-    public sealed class JsonNameAttribute : Attribute
-    {
-        public string[] Names { get; set; }
-        public JsonNameAttribute(params string[] names) { Names = names; }
-    }
-    public sealed class JsonIgnoreIfNullAttribute : Attribute
-    {
-        public JsonIgnoreIfNullAttribute() {}
-    }
     public partial class JToken
     {
         public static JToken FromObject(Object obj)      
@@ -775,28 +818,37 @@ namespace QuickJSON
         }
         public static JToken FromObject(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false)
+            bool ignoreobjectpropertyifnull = false, string setname = null)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull, setname);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r.IsInError ? null : r;
         }
         public static JToken FromObjectWithError(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false)
+            bool ignoreobjectpropertyifnull = false, string setname = null)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull,setname);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r;
+        }
+        class AttrControl
+        {
+            public string Name;             // name to call the output
+            public bool IgnoreMember;          // ignore member always
+            public bool IgnoreMemberIfNull;     // ignore member if null
+            public HashSet<string> IncludeSet;  // if set, sets the memberinclude variable for the object below
+            public HashSet<string> IgnoreSet;   // if set, sets the memberignore variable for the object below
         }
         private static JToken FromObjectInt(Object o, bool ignoreunserialisable, 
                         Type[] ignoredtypes, Stack<Object> objectlist, 
                         int lvl, int maxrecursiondepth, 
                         System.Reflection.BindingFlags membersearchflags,
                         HashSet<string> memberignore, HashSet<string> memberinclude,
-                        bool ignoreobjectpropertyifnull
+                        bool ignoreobjectpropertyifnull,
+                        string setname
                         )
         {
             if (lvl >= maxrecursiondepth)
@@ -816,7 +868,7 @@ namespace QuickJSON
                         objectlist.Pop();
                         return new JToken(TType.Error, "Self Reference in IDictionary");
                     }
-                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull);
+                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull,setname);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -850,7 +902,7 @@ namespace QuickJSON
                         objectlist.Pop();
                         return new JToken(TType.Error, "Self Reference in IEnumerable");
                     }
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull);
+                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull, setname);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -868,16 +920,97 @@ namespace QuickJSON
                 JObject outobj = new JObject();
                 var allmembers = tt.GetMembers(membersearchflags);
                 objectlist.Push(o);
+                Dictionary<string, AttrControl> namestosettings = null;
+                lock (CacheOfTypesFromMembers)        // thread lock
+                {
+                    var key = new Tuple<string, Type>(setname, tt);
+                    if (!CacheOfTypesFromMembers.TryGetValue(key, out namestosettings))
+                    {
+                        namestosettings = new Dictionary<string, AttrControl>();
+                        CacheOfTypesFromMembers[key] = namestosettings;
+                        foreach (var mi in allmembers)
+                        {
+                            if (mi.MemberType == System.Reflection.MemberTypes.Property || mi.MemberType == System.Reflection.MemberTypes.Field)
+                            {
+                                string attrname = mi.Name;
+                                var ac = new AttrControl() { Name = attrname }; 
+                                namestosettings[attrname] = ac;
+                                var calist = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                if ( calist.Length == 1)
+                                { 
+                                    JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
+                                    if (jia.Setting == null)       // null, means all sets
+                                    {
+                                        ac.IgnoreMember = true;
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < jia.Setting.Length; i++)
+                                        {
+                                            if (jia.Setting[i].Set.EqualsI(setname))  // else we match on set name
+                                            {
+                                                if (jia.Setting[i].Ignore != null)
+                                                    ac.IgnoreSet = jia.Setting[i].Ignore.ToHashSet();
+                                                else if (jia.Setting[i].IncludeOnly != null)
+                                                    ac.IncludeSet = jia.Setting[i].IncludeOnly.ToHashSet();
+                                                else
+                                                    ac.IgnoreMember = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                if ( renamelist.Length == 1)
+                                { 
+                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;         
+                                    if (na.Sets == null)        // null, means all sets
+                                    {
+                                        ac.Name = na.Names[0];
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < na.Sets.Length; i++)        // find set, if not found, no change, else first one gives the name
+                                        {
+                                            if (na.Sets[i].EqualsI(setname))
+                                            {
+                                                ac.Name = na.Names[i];
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                var ignorenulllist = mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false);
+                                if (ignorenulllist.Length == 1)
+                                {
+                                    JsonIgnoreIfNullAttribute iin = ignorenulllist[0] as JsonIgnoreIfNullAttribute;
+                                    if (iin.Sets == null)       // null, means all sets
+                                    {
+                                        ac.IgnoreMemberIfNull = true;
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < iin.Sets.Length; i++)  // find set, if not found, not applicable. Else its ignore if null
+                                        {
+                                            if (iin.Sets[i].EqualsI(setname))
+                                            {
+                                                ac.IgnoreMemberIfNull = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                    }
+                }
                 foreach (var mi in allmembers)
                 {
-                    string attrname = mi.Name;
-                    if ( (memberinclude != null && !memberinclude.Contains(attrname)) ||
-                            ( memberignore != null && memberignore.Contains(attrname)))
-                    {
-                        continue;
-                    }
-                    Type innertype = null;
-                    if (mi.MemberType == System.Reflection.MemberTypes.Property)
+                    Type innertype;
+                    if (mi.MemberType == System.Reflection.MemberTypes.Property)        // only properties  and fields are allowed thru
                     {
                         innertype = ((System.Reflection.PropertyInfo)mi).PropertyType;
                     }
@@ -888,27 +1021,17 @@ namespace QuickJSON
                     }
                     else
                         continue;       // not a prop/field
+                    string attrname = mi.Name;
+                    if ( (memberinclude != null && !memberinclude.Contains(attrname)) ||
+                            ( memberignore != null && memberignore.Contains(attrname)))
+                    {
+                        continue;
+                    }
                     if (ignoredtypes != null && Array.IndexOf(ignoredtypes, innertype) >= 0)
                         continue;
-                    HashSet<string> ignorelist = null;
-                    HashSet<string> includeonly = null;
-                    var ca = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                    if (ca.Length > 0)                                             
-                    {
-                        JsonIgnoreAttribute jia = ca[0] as JsonIgnoreAttribute;
-                        if (jia.Ignore != null)
-                            ignorelist = jia.Ignore.ToHashSet();
-                        else if (jia.IncludeOnly != null)
-                            includeonly = jia.IncludeOnly.ToHashSet();
-                        else
-                            continue;   // ignore all with no lists
-                    }
-                    var rename = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                    if (rename.Length == 1)                                         
-                    {
-                        dynamic attr = rename[0];                                   // dynamic since compiler does not know rename type
-                        attrname = attr.Names[0];                                   // only first entry is used for FromObject
-                    }
+                    AttrControl actrl = namestosettings[attrname];
+                    if (actrl.IgnoreMember)        // ignore all,stop
+                        continue;
                     Object innervalue = null;
                     if (mi.MemberType == System.Reflection.MemberTypes.Property)
                     {
@@ -927,7 +1050,7 @@ namespace QuickJSON
                             objectlist.Pop();
                             return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
-                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, ignorelist, includeonly, ignoreobjectpropertyifnull);     // may return End Object if not serializable
+                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, actrl.IgnoreSet, actrl.IncludeSet, ignoreobjectpropertyifnull, setname );
                         if (token.IsInError)
                         {
                             if (!ignoreunserialisable)
@@ -937,13 +1060,13 @@ namespace QuickJSON
                             }
                         }
                         else
-                            outobj[attrname] = token;
+                            outobj[actrl.Name] = token;
                     }
                     else
                     {
-                        bool ignoreifnull = ignoreobjectpropertyifnull || mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false).Length == 1;
+                        bool ignoreifnull = ignoreobjectpropertyifnull || actrl.IgnoreMemberIfNull;
                         if ( ignoreifnull == false)         
-                            outobj[attrname] = JToken.Null();        // its null so its a JNull
+                            outobj[actrl.Name] = JToken.Null();        // its null so its a JNull
                     }
                 }
                 objectlist.Pop();
@@ -954,6 +1077,11 @@ namespace QuickJSON
                 var r = JToken.CreateToken(o, false);        // return token or null indicating unserializable
                 return r ?? new JToken(TType.Error, "Unserializable " + tt.Name);
             }
+        }
+        static Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>> CacheOfTypesFromMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
+        public static void ClearFromObjectCache()
+        {
+            CacheOfTypesFromMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
         }
     }
 }
@@ -995,7 +1123,7 @@ namespace QuickJSON
         public override JToken FirstOrDefault() { return Objects.Count > 0 ? Objects.First().Value : null; }
         public override JToken LastOrDefault() { return Objects.Count > 0 ? Objects.Last().Value : null; }
         public string[] PropertyNames() { return Objects.Keys.ToArray(); }
-        public bool Contains(string name) { return Objects.ContainsKey(name); }
+        public override bool Contains(string name) { return Objects.ContainsKey(name); }
         public bool ContainsAllOfThese(params string[] name) { return Objects.Where(kvp => name.Contains(kvp.Key)).Count() == name.Length; }
         public int ContainsIndexOf(params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) return i; } return -1; }
         public int ContainsIndexOf(out JToken ret, params string[] name) { for (int i = 0; i < name.Length; i++) { if (Objects.ContainsKey(name[i])) { ret = Objects[name[i]]; return i; } } ret = null; return -1; }
@@ -1885,6 +2013,23 @@ namespace QuickJSON
             else
                 return null;
         }
+        public static JToken ReadJSONFile(this string filepath, JToken.ParseOptions flags = JToken.ParseOptions.None)
+        {
+            try
+            {
+                string ftext = System.IO.File.ReadAllText(filepath);
+                return JToken.Parse(ftext, flags);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        public static JToken ReadJSONAndConvertBack(this string jsontext, JToken.ParseOptions flags = JToken.ParseOptions.None, bool verbose = true)
+        {
+            JToken tk = JToken.Parse(jsontext, flags);
+            return tk?.ToString(verbose);
+        }
     }
 }
 namespace QuickJSON
@@ -2168,7 +2313,6 @@ namespace QuickJSON
     }
   
 }
-#define ENABLEINLINE
 namespace QuickJSON
 {
     public static class JTokenExtensions
@@ -2177,12 +2321,12 @@ namespace QuickJSON
         {
             return ToObject<T>(token, false, null);
         }
-        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, Func<Type, string, object> process = null)
+        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, Func<Type, string, object> process = null, string setname = null)
         {
             Type tt = typeof(T);
             try
             {
-                Object ret = token.ToObject(tt, ignoretypeerrors,process:process);        // paranoia, since there are a lot of dynamics, trap any exceptions
+                Object ret = token.ToObject(tt, ignoretypeerrors,process:process,setname:setname);        // paranoia, since there are a lot of dynamics, trap any exceptions
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -2200,11 +2344,13 @@ namespace QuickJSON
         public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors, 
                                     System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
                                     Object initialobject = null,
-                                    Func<Type, string, object> process = null)
+                                    Func<Type, string, object> process = null,
+                                    string setname = null
+                                    )
         {
             try
             {
-                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process);
+                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process, setname);
             }
             catch (Exception ex)
             {
@@ -2216,7 +2362,8 @@ namespace QuickJSON
         public static Object ToObject(this JToken token, Type converttype, bool ignoretypeerrors,
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
             Object initialobject = null,
-            Func<Type, string, object> process = null
+            Func<Type, string, object> process = null,
+            string setname = null
             )
         {
             if (token == null)
@@ -2309,48 +2456,74 @@ namespace QuickJSON
                          (converttype.IsValueType && !converttype.IsPrimitive && !converttype.IsEnum && converttype != typeof(DateTime)))   // or struct, but not datetime (handled below)
                 {
                     var instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the class, so class must has a constructor with no paras
-                    Dictionary<string, System.Reflection.MemberInfo> NamesToMI;
+                    Dictionary<string, System.Reflection.MemberInfo> namestosettings;
                     lock ( CacheOfTypesToMembers)        // thread lock
                     {
-                        if (!CacheOfTypesToMembers.TryGetValue(converttype, out NamesToMI))
+                        var key = new Tuple<string, Type>(setname, converttype);
+                        if (!CacheOfTypesToMembers.TryGetValue(key, out namestosettings))
                         {
-                            NamesToMI = new Dictionary<string, System.Reflection.MemberInfo>();     // name -> MI, or name->Null if ignored
-                            System.Reflection.MemberInfo[] fi = converttype.GetFields(membersearchflags);        // get field list..
-                            foreach (var mi in fi)
+                            namestosettings = new Dictionary<string, System.Reflection.MemberInfo>();     // name -> MI, or name->Null if ignored
+                            CacheOfTypesToMembers[key] = namestosettings;
+                            var list = new List<System.Reflection.MemberInfo>();
+                            list.AddRange(converttype.GetFields(membersearchflags));        // get field list..
+                            list.AddRange(converttype.GetProperties(membersearchflags));        // get property list
+                            foreach (var mi in list)
                             {
-                                var ignoreattr = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                                bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
-                                var attrlist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                if (attrlist.Length == 1)       // if we have an attribute of this
+                                bool includeit = true;
+                                var calist = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                                if (calist.Length == 1)
                                 {
-                                    var atlist = (JsonNameAttribute)attrlist[0];
-                                    foreach (var x in atlist.Names) // add all names and point to mi
-                                        NamesToMI[x] = includeit ? mi : null;
+                                    JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
+                                    if (jia.Setting == null)       // null, means all sets
+                                    {
+                                        includeit = false;
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < jia.Setting.Length; i++)        // try and find the set, if found
+                                        {
+                                            if (jia.Setting[i].Set.EqualsI(setname))        // found set, as long as its not an ignore/include list..
+                                            {
+                                                if (jia.Setting[i].Ignore == null && jia.Setting[i].IncludeOnly == null)
+                                                    includeit = false;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                                if (renamelist.Length == 1)
+                                {
+                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;          
+                                    if (na.Sets == null)        // null, means all sets
+                                    {
+                                        foreach (var x in na.Names)                                     
+                                            namestosettings[x] = includeit ? mi : null; // add all names and point to mi
+                                    }
+                                    else
+                                    {
+                                        for (int i = 0; i < na.Sets.Length; i++)  // find set, if not found, no change, else add name to one accepted for this member
+                                        {
+                                            if (na.Sets[i] == setname)
+                                            {
+                                                namestosettings[na.Names[i]] = includeit ? mi : null;     // we don't break, we can add multiple names with the sets matching more than once
+                                            }
+                                        }
+                                    }
                                 }
                                 else
-                                    NamesToMI[mi.Name] = includeit ? mi : null;    // else add the object name
-                            }
-                            System.Reflection.MemberInfo[] pi = converttype.GetProperties(membersearchflags);   // add properties to list
-                            foreach (var pmi in pi)
-                            {
-                                var ignoreattr = pmi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                                bool includeit = ignoreattr.Length == 0 || (((JsonIgnoreAttribute)ignoreattr[0]).Ignore != null) || (((JsonIgnoreAttribute)ignoreattr[0]).IncludeOnly != null);
-                                var attrlist = pmi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                if (attrlist.Length == 1)       // if we have an attribute of this
                                 {
-                                    var atlist = (JsonNameAttribute)attrlist[0];
-                                    foreach (var x in atlist.Names) // add all names and point to mi
-                                        NamesToMI[x] = includeit ? pmi : null;
+                                    namestosettings[mi.Name] = includeit ? mi : null;    // add the object name
                                 }
-                                else
-                                    NamesToMI[pmi.Name] = includeit ? pmi : null;      // no custom attr, just add the object name
                             }
-                            CacheOfTypesToMembers[converttype] = NamesToMI;
+                        }
+                        else
+                        {
                         }
                     }
                     foreach (var kvp in (JObject)token)
                     {
-                        if ( NamesToMI.TryGetValue(kvp.Key, out System.Reflection.MemberInfo mi))       // if can find
+                        if ( namestosettings.TryGetValue(kvp.Key, out System.Reflection.MemberInfo mi))       // if can find
                         {
                             if (mi!=null)                                   // ignore any ones with null as its member as its an ignored value
                             {
@@ -2641,10 +2814,10 @@ namespace QuickJSON
             public string PropertyName;
             public ToObjectError(string s) { ErrorString = s; PropertyName = ""; }
         };
-        static Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>> CacheOfTypesToMembers = new Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>>();
+        static Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>> CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>>();
         public static void ClearToObjectCache()
         {
-            CacheOfTypesToMembers = new Dictionary<Type, Dictionary<string, System.Reflection.MemberInfo>>();
+            CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>>();
         }
     }
 }
@@ -3033,6 +3206,10 @@ namespace QuickJSON.Utils
         public static string AlwaysQuoteString(this string obj)
         {
             return "\"" + obj.Replace("\"", "\\\"") + "\"";
+        }
+        public static bool EqualsI(this string a, string b)
+        {
+            return a==null && b==null ? true : a != null ? a.Equals(b, StringComparison.InvariantCulture) : false;
         }
     }
 }
