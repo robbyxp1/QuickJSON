@@ -23,6 +23,9 @@ namespace QuickJSON
     /// </summary>
     public sealed class JsonIgnoreAttribute : Attribute 
     {
+        /// <summary>
+        /// Class to hold a JSON ignore setting for a single set
+        /// </summary>
         public class SetSetting
         {
             /// <summary> Set name. Attribute sets allow selection of different outputs from the same class </summary>
@@ -32,8 +35,11 @@ namespace QuickJSON
             /// <summary> FromObject: If non null, list of object members to include only</summary>
             public string[] IncludeOnly { get; set; }
 
+            /// <summary> Construct default set setting </summary>
             public SetSetting() { }
-            public SetSetting(string set ) { Set = set; } 
+            /// <summary> Construct a set setting for a named set </summary>
+            public SetSetting(string set ) { Set = set; }
+            /// <summary> Construct a set setting for a named set with include/ignore and a list of names</summary>
             public SetSetting(string set, Operation ignoreorinclude, string[] names)
             {
                 Set = set;
