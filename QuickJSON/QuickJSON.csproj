@@ -21,7 +21,13 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>2.2
+    <PackageReleaseNotes>2.5
+FromObject now caches member info for speed.
+ToObject and FromObject attributes Json* now accept a set name allowing multiple configurations of json ignore, json name, json ignore if void
+to be created, and ToObject/FromObject allows the setname to be selected.  
+Add helper static string.ReadJSONFile for quick reading of a json file.
+JToken.Contains is now virtual and is overriden in JObject. You can use token.Contains() to see if its an object and it contains this key.
+2.2
 ToObject now caches member info for speed. checkcustomattr is now withdrawn from the interfaces.
 2.1
 Can Add/AddRange to a JArray via a JToken now, and add to a JObject via JToken
@@ -64,11 +70,11 @@ DoubleNull and FloatNull added</PackageReleaseNotes>
 Designed for speed and compactness.
 Code can be XCOPYED into your project to avoid DLL dependencies.
 </Description>
-    <Copyright>(C) robbyxp @ github.com  2020-2024</Copyright>
+    <Copyright>(C) robbyxp @ github.com  2020-2025</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.2.0</Version>
-    <AssemblyVersion>2.2.0.0</AssemblyVersion>
-    <FileVersion>2.2.0.0</FileVersion>
+    <Version>2.5.0</Version>
+    <AssemblyVersion>2.5.0.0</AssemblyVersion>
+    <FileVersion>2.5.0.0</FileVersion>
     <Company>robbyxp @ github.com</Company>
   </PropertyGroup>
 

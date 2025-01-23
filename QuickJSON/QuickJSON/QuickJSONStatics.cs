@@ -594,13 +594,17 @@ namespace QuickJSON
         {
             try
             {
-                string ftext = System.IO.File.ReadAllText(filepath);
-                return JToken.Parse(ftext, flags);
+                if (System.IO.File.Exists(filepath))
+                {
+                    string ftext = System.IO.File.ReadAllText(filepath);
+                    return JToken.Parse(ftext, flags);
+                }
             }
             catch
             {
-                return null;
             }
+
+            return null;
         }
         /// <summary> Read a JSON string, convert it, then turn it back to a string (default verbose)</summary>
         public static JToken ReadJSONAndConvertBack(this string jsontext, JToken.ParseOptions flags = JToken.ParseOptions.None, bool verbose = true)
