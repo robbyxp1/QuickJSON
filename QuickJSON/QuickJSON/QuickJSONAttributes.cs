@@ -91,7 +91,7 @@ namespace QuickJSON
             };
         }
 
-        /// <summary> FromObject: Constructor to indicate which members of this class to enumerate to JSON, by set and with include/ignore attributes, 3 times
+        /// <summary> FromObject: Constructor to indicate which members of this class to enumerate to JSON, by set and with include/ignore attributes, three times
         /// ToObject: the setting is ignored and the member processed as normal
         /// </summary>
         public JsonIgnoreAttribute(string setname1, Operation ignoreorinclude1, string[] names1,
@@ -141,7 +141,22 @@ public sealed class JsonNameAttribute : Attribute
         /// <summary> Constructor, applies to all sets </summary>
         public JsonIgnoreIfNullAttribute() { Sets = null; }
         /// <summary> Constructor with a list of sets to apply this to.</summary>
-        public JsonIgnoreIfNullAttribute(string[] setnames) { Sets = setnames; }
+        public JsonIgnoreIfNullAttribute(params string[] setnames) { Sets = setnames; }
+    }
+
+    /// <summary>
+    /// Attach to a member of a class to indicate a custom output/input call is needed
+    /// Must supply customformat callback
+    /// </summary>
+    public sealed class JsonCustomFormat : Attribute
+    {
+        /// <summary> If non null, this belongs to an attribute set name to check.  If null, applies to all sets
+        /// Attribute sets allow selection of different outputs from the same class </summary>
+        public string[] Sets { get; set; }
+
+        /// <summary> Constructor, applies to all sets </summary>
+        public JsonCustomFormat() { Sets = null; }
+        public JsonCustomFormat(params string[] setnames) { Sets = setnames; }
     }
 
 }

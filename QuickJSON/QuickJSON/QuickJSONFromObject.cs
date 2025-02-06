@@ -39,13 +39,14 @@ namespace QuickJSON
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
+        /// <param name="customconvert">Use this custom converter on class members when they are marked with [JsonCustomFormat]n</param>
         /// <returns>Null if can't convert (error detected) or JToken tree</returns>
         public static JToken FromObject(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false, string setname = null)
+            bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull, setname);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull, setname, customconvert);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r.IsInError ? null : r;
         }
@@ -58,24 +59,16 @@ namespace QuickJSON
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
+        /// <param name="customconvert">Use this custom converter on class members when they are marked with [JsonCustomFormat]n</param>
         /// <returns>JToken error type if can't convert (check with IsInError, value has error reason) or JToken tree</returns>
         public static JToken FromObjectWithError(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false, string setname = null)
+            bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
         {
             Stack<Object> objectlist = new Stack<object>();
-            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull,setname);
+            var r = FromObjectInt(obj, ignoreunserialisable, ignored, objectlist,0,maxrecursiondepth, membersearchflags,null,null,ignoreobjectpropertyifnull,setname, customconvert);
             System.Diagnostics.Debug.Assert(objectlist.Count == 0);
             return r;
-        }
-
-        class AttrControl
-        {
-            public string Name;             // name to call the output
-            public bool IgnoreMember;          // ignore member always
-            public bool IgnoreMemberIfNull;     // ignore member if null
-            public HashSet<string> IncludeSet;  // if set, sets the memberinclude variable for the object below
-            public HashSet<string> IgnoreSet;   // if set, sets the memberignore variable for the object below
         }
 
         /// <summary>
@@ -92,6 +85,7 @@ namespace QuickJSON
         /// <param name="memberinclude">which members of a class to include only, null for all, else must be in list</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <param name="setname">Define set of JSON attributes to apply</param>
+        /// <param name="customconvert">Use this custom converter on class members when they are marked with [JsonCustomFormat]n</param>
         /// <returns></returns>
         private static JToken FromObjectInt(Object o, bool ignoreunserialisable, 
                         Type[] ignoredtypes, Stack<Object> objectlist, 
@@ -99,8 +93,9 @@ namespace QuickJSON
                         System.Reflection.BindingFlags membersearchflags,
                         HashSet<string> memberignore, HashSet<string> memberinclude,
                         bool ignoreobjectpropertyifnull,
-                        string setname
-                        )
+                        string setname,
+                        Func<Object, JToken> customconvert
+            )
         {
             //System.Diagnostics.Debug.WriteLine(lvl + "From Object on " + o.GetType().Name);
 
@@ -128,7 +123,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IDictionary");
                     }
 
-                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull,setname);
+                    JToken inner = FromObjectInt(kvp.Value, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null,null, ignoreobjectpropertyifnull,setname, customconvert);
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -168,7 +163,7 @@ namespace QuickJSON
                         return new JToken(TType.Error, "Self Reference in IEnumerable");
                     }
 
-                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull, setname);
+                    JToken inner = FromObjectInt(oa, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, null, null, ignoreobjectpropertyifnull, setname, customconvert);
 
                     if (inner.IsInError)      // used as an error type
                     {
@@ -215,13 +210,13 @@ namespace QuickJSON
                             if (mi.MemberType == System.Reflection.MemberTypes.Property || mi.MemberType == System.Reflection.MemberTypes.Field)
                             {
                                 string attrname = mi.Name;
-                                var ac = new AttrControl() { Name = attrname }; 
+                                var ac = new AttrControl() { Name = attrname };
                                 namestosettings[attrname] = ac;
 
                                 // check on json ignore
                                 var calist = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                                if ( calist.Length == 1)
-                                { 
+                                if (calist.Length == 1)
+                                {
                                     JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
 
                                     if (jia.Setting == null)       // null, means all sets
@@ -248,9 +243,9 @@ namespace QuickJSON
 
                                 // check on name
                                 var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                if ( renamelist.Length == 1)
-                                { 
-                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;         
+                                if (renamelist.Length == 1)
+                                {
+                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;
                                     if (na.Sets == null)        // null, means all sets
                                     {
                                         ac.Name = na.Names[0];
@@ -290,7 +285,15 @@ namespace QuickJSON
                                     }
                                 }
 
-                                //System.Diagnostics.Debug.WriteLine($"FromObjectType `{setname}`:{tt.Name} attr {attrname} -> {ac.Name} : ignoreall {ac.IgnoreAll} ignoreifnull {ac.IgnoreIfNull} incl {ac.IncludeSet != null} ignore {ac.IgnoreSet != null}");
+                                var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
+                                if (customoutput.Length == 1)
+                                {
+                                    JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
+                                    if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                    {
+                                        ac.CustomFormat = true;
+                                    }
+                                }
                             }
                         }
                     }
@@ -368,7 +371,8 @@ namespace QuickJSON
                             return new JToken(TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
 
-                        var token = FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, actrl.IgnoreSet, actrl.IncludeSet, ignoreobjectpropertyifnull, setname );
+                        var token = actrl.CustomFormat ? customconvert(innervalue) : 
+                                    FromObjectInt(innervalue, ignoreunserialisable, ignoredtypes, objectlist, lvl + 1, maxrecursiondepth, membersearchflags, actrl.IgnoreSet, actrl.IncludeSet, ignoreobjectpropertyifnull, setname, customconvert );
 
                         if (token.IsInError)
                         {
@@ -397,9 +401,18 @@ namespace QuickJSON
             else
             {
                 var r = JToken.CreateToken(o, false);        // return token or null indicating unserializable
-                                                             //                return r ?? new JToken(TType.Error, "Unserializable " + tt.Name);
                 return r ?? new JToken(TType.Error, "Unserializable " + tt.Name);
             }
+        }
+
+        class AttrControl
+        {
+            public string Name;             // name to call the output
+            public bool CustomFormat;           // if custom format needs customconvert
+            public bool IgnoreMember;          // ignore member always
+            public bool IgnoreMemberIfNull;     // ignore member if null
+            public HashSet<string> IncludeSet;  // if set, sets the memberinclude variable for the object below
+            public HashSet<string> IgnoreSet;   // if set, sets the memberignore variable for the object below
         }
 
         static Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>> CacheOfTypesFromMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();

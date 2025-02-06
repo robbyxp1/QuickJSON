@@ -435,6 +435,76 @@ namespace JSONTests
             }
         }
 
+        class CustomFromTest1
+        {
+            [JsonCustomFormat]
+            public Color v1;
+            public string v2;
+            public DateTime dt;
+        }
+
+
+        [Test]
+        public void JSONFromObjectCustomConvert()
+        {
+            {
+                var c1 = new CustomFromTest1() { v1 = Color.FromArgb(255,30,40,50), v2 = "kwkw", dt = DateTime.Now };
+
+                var jo = JToken.FromObject(c1,false,membersearchflags:System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.Public, 
+                                customconvert: (o) => { if (o is Color) return JToken.CreateToken(System.Drawing.ColorTranslator.ToHtml((Color)o)); else return JToken.CreateToken(o, false); });
+                Check.That(jo).IsNotNull();
+                Check.That(jo["v1"].Str()).IsEqualTo("#1E2832");
+
+                CustomFromTest1 c2 = jo.ToObject<CustomFromTest1>(customformat:(ty,o) => 
+                { return System.Drawing.ColorTranslator.FromHtml((string)o); });
+                Check.That(c1.v1).IsEqualTo(c2.v1);
+            }
+
+        }
+
+        class CustomFromTest2
+        {
+            [JsonCustomFormat("Custom")]
+            public Color v1;
+            public string v2;
+            public DateTime dt;
+        }
+
+
+        [Test]
+        public void JSONFromObjectCustomConvert2()      // DEMO sets using custom format
+        {
+            {
+                var c1 = new CustomFromTest2() { v1 = Color.FromArgb(255, 30, 40, 50), v2 = "kwkw", dt = DateTime.Now };
+
+                var jo = JToken.FromObject(c1, false, 
+                                membersearchflags: System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public,
+                                setname:"Custom",
+                                customconvert: (o) => { 
+                                    if (o is Color) return JToken.CreateToken(System.Drawing.ColorTranslator.ToHtml((Color)o))
+                                        ; else return JToken.CreateToken(o, false); 
+                                });
+
+                Check.That(jo).IsNotNull();
+                Check.That(jo["v1"].Str()).IsEqualTo("#1E2832");
+
+                // not the right set
+
+                CustomFromTest2 c2 = jo.ToObject<CustomFromTest2>(customformat: (ty, o) =>
+                                                                        { return System.Drawing.ColorTranslator.FromHtml((string)o); }, setname:"Custom");
+                Check.That(c1.v1).IsEqualTo(c2.v1);
+
+                var jo2 = JToken.FromObject(c1, false,
+                                membersearchflags: System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public
+                                );
+
+                Check.That(jo2).IsNotNull();
+                Check.That(jo2["v1"].IsObject).IsTrue();
+                Check.That(jo2["v1"]["R"].Int()).IsEqualTo(30);
+
+            }
+
+        }
 
     }
 }

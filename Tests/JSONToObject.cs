@@ -253,8 +253,8 @@ namespace JSONTests
             Check.That(decoded.two == "two").IsTrue();
             Check.That(decoded.three == 30).IsTrue();
             Check.That(decoded.four == true).IsTrue();
-            
-            decoded = decode.ToObject<IgnoreTest>(true,setname:"S1");
+
+            decoded = decode.ToObject<IgnoreTest>(true, setname: "S1");
             Check.That(decoded).IsNotNull();
             Check.That(decoded.one == "one").IsTrue();
             Check.That(decoded.two == null).IsTrue();        // two is ignored
@@ -569,14 +569,16 @@ namespace JSONTests
                 Check.That(((JTokenExtensions.ToObjectError)Raw).ErrorString.Contains("Enum Token is not string"));
 
             }
+        }
 
-
+        public void JSONToObjectEnumProcess()
+        {
             {
                 string matlist = @"{ ""Raw"":{ ""t1"":""$three;"" } }";
                 JToken matlistj = JToken.Parse(matlist);
-                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, process:(type,text)=> {
+                var Raw = matlistj["Raw"]?.ToObject(typeof(FromObjectTest), false, process: (type, text) => {
                     if (type == typeof(TestEnum))
-                        return Enum.Parse(typeof(TestEnum),text.Substring(1, text.Length - 2),true);
+                        return Enum.Parse(typeof(TestEnum), text.Substring(1, text.Length - 2), true);
                     else
                         return "CRAP";
                 });
@@ -585,6 +587,8 @@ namespace JSONTests
             }
 
         }
+
+
 
     }
 }

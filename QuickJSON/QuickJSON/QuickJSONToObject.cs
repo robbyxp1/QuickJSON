@@ -12,12 +12,10 @@
  * governing permissions and limitations under the License.
  */
 
-// debatebale if its faster, it seems marginally so. leave on.  Enables inline processing of some types in classes
-#define ENABLEINLINE
-
 using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using static QuickJSON.JToken;
 
 namespace QuickJSON
@@ -34,7 +32,7 @@ namespace QuickJSON
         /// <returns>New object T containing fields filled by JToken, or default(T) on error</returns>
         public static T ToObjectQ<T>(this JToken token)          
         {
-            return ToObject<T>(token, false, null);
+            return ToObject<T>(token, false);
         }
 
         /// <summary> Convert the JToken tree to an object of type T. Protected from all exception sources</summary>
@@ -43,13 +41,17 @@ namespace QuickJSON
         /// <param name="ignoretypeerrors">Ignore any errors in type between the JToken type and the member type.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
+        /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>New object T containing fields filled by JToken, or default(T) on error. </returns>
-        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, Func<Type, string, object> process = null, string setname = null)
+        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, 
+                                        Func<Type, string, object> process = null, 
+                                        string setname = null,
+                                        Func<Type, object, object> customformat = null)
         {
             Type tt = typeof(T);
             try
             {
-                Object ret = token.ToObject(tt, ignoretypeerrors,process:process,setname:setname);        // paranoia, since there are a lot of dynamics, trap any exceptions
+                Object ret = token.ToObject(tt, ignoretypeerrors,process:process,setname:setname, customformat:customformat);        // paranoia, since there are a lot of dynamics, trap any exceptions
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -72,20 +74,22 @@ namespace QuickJSON
         /// <param name="ignoretypeerrors">Ignore any errors in type between the JToken type and the member type.</param>
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
-        /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
+        /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime.</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
+        /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
 
         public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors, 
                                     System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
                                     Object initialobject = null,
                                     Func<Type, string, object> process = null,
-                                    string setname = null
+                                    string setname = null,
+                                    Func<Type, object, object> customformat = null
                                     )
         {
             try
             {
-                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process, setname);
+                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process, setname, customformat);
             }
             catch (Exception ex)
             {
@@ -103,6 +107,7 @@ namespace QuickJSON
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
+        /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
         /// <exception cref="System.Exception"> Generic exception</exception>
         /// <exception cref="System.InvalidCastException"> If a type failure occurs.  Other excepections could also occur.
@@ -111,7 +116,8 @@ namespace QuickJSON
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
             Object initialobject = null,
             Func<Type, string, object> process = null,
-            string setname = null
+            string setname = null,
+            Func<Type,object,object> customformat = null
             )
         {
             if (token == null)
@@ -132,7 +138,7 @@ namespace QuickJSON
                         {
                             // get the underlying element, must match array element type
 
-                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, membersearchflags: membersearchflags, process: process);
+                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, membersearchflags, null, process, setname, customformat);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
                             {
@@ -156,7 +162,7 @@ namespace QuickJSON
                         for (int i = 0; i < token.Count; i++)
                         {
                             // get the underlying element, must match types[0] which is list type
-                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, membersearchflags: membersearchflags, process: process);
+                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, membersearchflags, null, process, setname, customformat);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
                             {
@@ -192,7 +198,7 @@ namespace QuickJSON
                     {
                         // get the value as the dictionary type - it must match type or it get OE
 
-                        Object ret = ToObject(kvp.Value, types[1], ignoretypeerrors, membersearchflags: membersearchflags, process: process);
+                        Object ret = ToObject(kvp.Value, types[1], ignoretypeerrors, membersearchflags, null, process, setname, customformat);
 
                         if (ret != null && ret.GetType() == typeof(ToObjectError))
                         {
@@ -224,7 +230,7 @@ namespace QuickJSON
 
                     // see if we have already dealt with this converttype
 
-                    Dictionary<string, System.Reflection.MemberInfo> namestosettings;
+                    Dictionary<string, AttrControl> namestosettings;
 
                     lock ( CacheOfTypesToMembers)        // thread lock
                     {
@@ -236,7 +242,7 @@ namespace QuickJSON
                         {
                            // System.Diagnostics.Debug.WriteLine($"Created cached control {key}");
 
-                            namestosettings = new Dictionary<string, System.Reflection.MemberInfo>();     // name -> MI, or name->Null if ignored
+                            namestosettings = new Dictionary<string, AttrControl>();     // name -> MI, or name->Null if ignored
                             CacheOfTypesToMembers[key] = namestosettings;
 
                             var list = new List<System.Reflection.MemberInfo>();
@@ -270,6 +276,17 @@ namespace QuickJSON
                                     }
                                 }
 
+                                bool cf = false;
+                                var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
+                                if (customoutput.Length == 1)
+                                {
+                                    JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
+                                    if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                    {
+                                        cf = true;
+                                    }
+                                }
+
                                 var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
                                 if (renamelist.Length == 1)
                                 {
@@ -277,15 +294,15 @@ namespace QuickJSON
                                     if (na.Sets == null)        // null, means all sets
                                     {
                                         foreach (var x in na.Names)                                     
-                                            namestosettings[x] = includeit ? mi : null; // add all names and point to mi
+                                            namestosettings[x] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf }; // add all names and point to mi
                                     }
                                     else
                                     {
                                         for (int i = 0; i < na.Sets.Length; i++)  // find set, if not found, no change, else add name to one accepted for this member
                                         {
-                                            if (na.Sets[i] == setname)
+                                            if (na.Sets[i].EqualsI(setname))
                                             {
-                                                namestosettings[na.Names[i]] = includeit ? mi : null;     // we don't break, we can add multiple names with the sets matching more than once
+                                                namestosettings[na.Names[i]] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };     // we don't break, we can add multiple names with the sets matching more than once
                                                 //System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
                                             }
                                         }
@@ -293,9 +310,10 @@ namespace QuickJSON
                                 }
                                 else
                                 {
-                                    namestosettings[mi.Name] = includeit ? mi : null;    // add the object name
+                                    namestosettings[mi.Name] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };    // add the object name
                                     //System.Diagnostics.Debug.WriteLine($"ToObjectType {mi.Name} {includeit}");
                                 }
+
                             }
                         }
                         else
@@ -307,15 +325,16 @@ namespace QuickJSON
 
                     foreach (var kvp in (JObject)token)
                     {
-                        if ( namestosettings.TryGetValue(kvp.Key, out System.Reflection.MemberInfo mi))       // if can find
+                        if ( namestosettings.TryGetValue(kvp.Key, out AttrControl ac))       // if can find
                         {
+                            System.Reflection.MemberInfo mi = ac.MemberInfo;
+
                             if (mi!=null)                                   // ignore any ones with null as its member as its an ignored value
                             {
                                 Type otype = mi.FieldPropertyType();        
                                 string name = otype.Name;                         // compare by name quicker than is
                                 var tk = kvp.Value;
                                 bool success = false;
-#if ENABLEINLINE
 
                                 // We pick off the most common types here for speed reasons. Less common types, arrays, objects are dealt with by recursing into ToObject
 
@@ -328,13 +347,19 @@ namespace QuickJSON
                                 if (tk.IsArray || tk.IsObject)
                                 {
                                     // complex, ToObject it, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags: membersearchflags, process: process);
+                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags, null, process, setname, customformat);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
                                 }
-                                else
-                                if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
+                                else if (ac.CustomFormat)
+                                {
+                                    Object p = customformat(otype, tk.Value);
+
+                                    if (p != null && p.GetType() != typeof(ToObjectError))  // if good, and not error, try set
+                                        success = mi.SetValue(instance, p);
+                                }
+                                else if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                                 {
                                     if (tk.IsNull)
                                         success = mi.SetValue(instance, null);
@@ -388,8 +413,7 @@ namespace QuickJSON
                                     else if (tk.TokenType == TType.Double)
                                         success = mi.SetValue(instance, (float)(double)tk.Value);
                                 }
-                                else 
-                                if (otype.IsEnum)
+                                else if (otype.IsEnum)
                                 {
                                     if (tk.IsString)     // if string, possible
                                     {
@@ -438,10 +462,9 @@ namespace QuickJSON
                                     success = mi.SetValue(instance, null);
                                 }
                                 else
-#endif
                                 {
                                     // other complex, ToObject it, prob an enum, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags: membersearchflags, process: process);
+                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags, null, process, setname, customformat);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -627,14 +650,19 @@ namespace QuickJSON
             public ToObjectError(string s) { ErrorString = s; PropertyName = ""; }
         };
 
+        class AttrControl
+        {
+            public System.Reflection.MemberInfo MemberInfo; 
+            public bool CustomFormat;           // if custom format needs customconvert
+        }
 
         // cache
-        static Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>> CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>>();
+        static Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>> CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
 
         /// <summary> Clear ToObject convert cache </summary>
         public static void ClearToObjectCache()
         {
-            CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, System.Reflection.MemberInfo>>();
+            CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
         }
 
     }
