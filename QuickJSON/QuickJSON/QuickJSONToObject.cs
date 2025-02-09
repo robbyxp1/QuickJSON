@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2021-2024 Robbyxp1 @ github.com
+ * Copyright © 2021-2025 Robbyxp1 @ github.com
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
  * file except in compliance with the License. You may obtain a copy of the License at
@@ -16,7 +16,9 @@ using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using static QuickJSON.JToken;
+using static QuickJSON.JTokenExtensions;
 
 namespace QuickJSON
 {
@@ -30,7 +32,7 @@ namespace QuickJSON
         /// <typeparam name="T">Convert to this type</typeparam>
         /// <param name="token">JToken to convert from</param>
         /// <returns>New object T containing fields filled by JToken, or default(T) on error</returns>
-        public static T ToObjectQ<T>(this JToken token)          
+        public static T ToObjectQ<T>(this JToken token)
         {
             return ToObject<T>(token, false);
         }
@@ -43,15 +45,16 @@ namespace QuickJSON
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
         /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>New object T containing fields filled by JToken, or default(T) on error. </returns>
-        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false, 
-                                        Func<Type, string, object> process = null, 
+        public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false,
+                                        Func<Type, string, object> process = null,
                                         string setname = null,
                                         Func<Type, object, object> customformat = null)
         {
-            Type tt = typeof(T);
             try
             {
-                Object ret = token.ToObject(tt, ignoretypeerrors,process:process,setname:setname, customformat:customformat);        // paranoia, since there are a lot of dynamics, trap any exceptions
+                ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static, 
+                                                                process, customformat, setname);
+                Object ret = cnv.Execute(token, typeof(T), null);
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -79,7 +82,7 @@ namespace QuickJSON
         /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
 
-        public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors, 
+        public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors,
                                     System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
                                     Object initialobject = null,
                                     Func<Type, string, object> process = null,
@@ -89,15 +92,17 @@ namespace QuickJSON
         {
             try
             {
-                return ToObject(token, converttype, ignoretypeerrors, membersearchflags, initialobject, process, setname, customformat);
+                ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
+                return cnv.Execute(token, converttype, initialobject);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Exception JSON ToObject " + ex.Message + " " + ex.StackTrace);
             }
             return null;
-       
+
         }
+
         /// <summary> Convert the JToken tree to an object of type.  This member will except.</summary>
         /// <param name="token">JToken to convert from</param>
         /// <param name="converttype">Type to convert to</param>
@@ -117,8 +122,62 @@ namespace QuickJSON
             Object initialobject = null,
             Func<Type, string, object> process = null,
             string setname = null,
-            Func<Type,object,object> customformat = null
+            Func<Type, object, object> customformat = null
             )
+        {
+            ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
+            return cnv.Execute(token, converttype, initialobject);
+        }
+
+        /// <summary> Class to hold an conversion error </summary>
+        public class ToObjectError
+        {
+            /// <summary> Error string </summary>
+            public string ErrorString;
+            /// <summary> Property name causing the error, if applicable. Null otherwise</summary>
+            public string PropertyName;
+            /// <summary> Constructor </summary>
+            public ToObjectError(string s) { ErrorString = s; PropertyName = ""; }
+        };
+
+        /// <summary> Clear ToObject convert cache </summary>
+        public static void ClearToObjectCache()
+        {
+            ToObjectConverter.CacheOfTypesToMembers.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Class to perform object conversion, added due to amount now of configuration data held over the iterations
+    /// </summary>
+    internal class ToObjectConverter
+    {
+        public class AttrControl
+        {
+            public MemberInfo MemberInfo;       // null if not to include this json name information into the object, else the member to set.
+            public bool CustomFormat;           // if custom format call should be used to convert it
+        }
+
+        static public Dictionary<Tuple<string, Type, BindingFlags>, Dictionary<string, AttrControl>> CacheOfTypesToMembers =
+                    new Dictionary<Tuple<string, Type,BindingFlags>, Dictionary<string, AttrControl>>();
+
+        private bool ignoretypeerrors;
+        private BindingFlags membersearchflags;
+        private Func<Type, string, object> process;
+        private Func<Type, object, object> customformat;
+        private string setname;
+
+        public ToObjectConverter(bool ignoretypeerrors, BindingFlags membersearchflags, Func<Type, string, object> process,
+                                    Func<Type, object, object> customformat, string setname)
+        {
+            this.ignoretypeerrors = ignoretypeerrors;
+            this.membersearchflags = membersearchflags;
+            this.process = process;
+            this.customformat = customformat;
+            this.setname = setname;
+        }
+
+        public Object Execute(JToken token, Type converttype, Object initialobject)
         {
             if (token == null)
             {
@@ -138,7 +197,7 @@ namespace QuickJSON
                         {
                             // get the underlying element, must match array element type
 
-                            Object ret = ToObject(token[i], converttype.GetElementType(), ignoretypeerrors, membersearchflags, null, process, setname, customformat);
+                            Object ret = Execute(token[i], converttype.GetElementType(), null);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
                             {
@@ -162,7 +221,7 @@ namespace QuickJSON
                         for (int i = 0; i < token.Count; i++)
                         {
                             // get the underlying element, must match types[0] which is list type
-                            Object ret = ToObject(token[i], types[0], ignoretypeerrors, membersearchflags, null, process, setname, customformat);
+                            Object ret = Execute(token[i], types[0], null);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
                             {
@@ -198,7 +257,7 @@ namespace QuickJSON
                     {
                         // get the value as the dictionary type - it must match type or it get OE
 
-                        Object ret = ToObject(kvp.Value, types[1], ignoretypeerrors, membersearchflags, null, process, setname, customformat);
+                        Object ret = Execute(kvp.Value, types[1], null);
 
                         if (ret != null && ret.GetType() == typeof(ToObjectError))
                         {
@@ -224,115 +283,26 @@ namespace QuickJSON
                     return instance;
                 }
                 else if (converttype.IsClass ||      // if class
-                         (converttype.IsValueType && !converttype.IsPrimitive && !converttype.IsEnum && converttype != typeof(DateTime)))   // or struct, but not datetime (handled below)
+                            (converttype.IsValueType && !converttype.IsPrimitive && !converttype.IsEnum && converttype != typeof(DateTime)))   // or struct, but not datetime (handled below)
                 {
                     var instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the class, so class must has a constructor with no paras
 
                     // see if we have already dealt with this converttype
 
-                    Dictionary<string, AttrControl> namestosettings;
-
-                    lock ( CacheOfTypesToMembers)        // thread lock
-                    {
-                        // try and find previously computed info
-
-                        var key = new Tuple<string, Type>(setname, converttype);
-
-                        if (!CacheOfTypesToMembers.TryGetValue(key, out namestosettings))
-                        {
-                           // System.Diagnostics.Debug.WriteLine($"Created cached control {key}");
-
-                            namestosettings = new Dictionary<string, AttrControl>();     // name -> MI, or name->Null if ignored
-                            CacheOfTypesToMembers[key] = namestosettings;
-
-                            var list = new List<System.Reflection.MemberInfo>();
-                            list.AddRange(converttype.GetFields(membersearchflags));        // get field list..
-                            list.AddRange(converttype.GetProperties(membersearchflags));        // get property list
-
-                            foreach (var mi in list)
-                            {
-                                bool includeit = true;
-
-                                // compute if to be ignored
-                                var calist = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
-                                if (calist.Length == 1)
-                                {
-                                    JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
-                                    if (jia.Setting == null)       // null, means all sets
-                                    {
-                                        includeit = false;
-                                    }
-                                    else
-                                    {
-                                        for (int i = 0; i < jia.Setting.Length; i++)        // try and find the set, if found
-                                        {
-                                            if (jia.Setting[i].Set.EqualsI(setname))        // found set, as long as its not an ignore/include list..
-                                            {
-                                                if (jia.Setting[i].Ignore == null && jia.Setting[i].IncludeOnly == null)
-                                                    includeit = false;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                bool cf = false;
-                                var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
-                                if (customoutput.Length == 1)
-                                {
-                                    JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
-                                    if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
-                                    {
-                                        cf = true;
-                                    }
-                                }
-
-                                var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
-                                if (renamelist.Length == 1)
-                                {
-                                    JsonNameAttribute na = renamelist[0] as JsonNameAttribute;          
-                                    if (na.Sets == null)        // null, means all sets
-                                    {
-                                        foreach (var x in na.Names)                                     
-                                            namestosettings[x] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf }; // add all names and point to mi
-                                    }
-                                    else
-                                    {
-                                        for (int i = 0; i < na.Sets.Length; i++)  // find set, if not found, no change, else add name to one accepted for this member
-                                        {
-                                            if (na.Sets[i].EqualsI(setname))
-                                            {
-                                                namestosettings[na.Names[i]] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };     // we don't break, we can add multiple names with the sets matching more than once
-                                                //System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
-                                            }
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    namestosettings[mi.Name] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };    // add the object name
-                                    //System.Diagnostics.Debug.WriteLine($"ToObjectType {mi.Name} {includeit}");
-                                }
-
-                            }
-                        }
-                        else
-                        {
-                         //   System.Diagnostics.Debug.WriteLine($"Lookup cached control {key}");
-                        }
-
-                    }
+                    Dictionary<string, AttrControl> namestosettings = GetOrCreate(converttype, setname, membersearchflags);
 
                     foreach (var kvp in (JObject)token)
                     {
-                        if ( namestosettings.TryGetValue(kvp.Key, out AttrControl ac))       // if can find
-                        {
-                            System.Reflection.MemberInfo mi = ac.MemberInfo;
+                        // if can find information about this field, we process it. Else its an unknown JSON field name, ignore
 
-                            if (mi!=null)                                   // ignore any ones with null as its member as its an ignored value
+                        if (namestosettings.TryGetValue(kvp.Key, out AttrControl ac))       
+                        {
+                            MemberInfo mi = ac.MemberInfo;
+
+                            if (mi != null)                                     // ignore any ones with null as its memberinfo as its an ignored value
                             {
-                                Type otype = mi.FieldPropertyType();        
-                                string name = otype.Name;                         // compare by name quicker than is
+                                Type otype = mi.FieldPropertyType();
+                                string name = otype.Name;                       // compare by name quicker than is
                                 var tk = kvp.Value;
                                 bool success = false;
 
@@ -347,7 +317,7 @@ namespace QuickJSON
                                 if (tk.IsArray || tk.IsObject)
                                 {
                                     // complex, ToObject it, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags, null, process, setname, customformat);
+                                    Object ret = Execute(kvp.Value, otype, null);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -464,7 +434,7 @@ namespace QuickJSON
                                 else
                                 {
                                     // other complex, ToObject it, prob an enum, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = ToObject(kvp.Value, otype, ignoretypeerrors, membersearchflags, null, process, setname, customformat);
+                                    Object ret = Execute(kvp.Value, otype, null);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -617,7 +587,7 @@ namespace QuickJSON
                 }
                 else if (name.Equals("DateTime"))
                 {
-                    if ( tk.IsString )       // must be a string
+                    if (tk.IsString)       // must be a string
                     {
                         if (process != null)
                             return process(converttype, (string)tk.Value);
@@ -637,34 +607,104 @@ namespace QuickJSON
 
                 return new ToObjectError("JSONToObject: Bad Conversion " + tk.TokenType + " to " + converttype.Name);
             }
+
         }
 
-        /// <summary> Class to hold an conversion error </summary>
-        public class ToObjectError
+        static public Dictionary<string, AttrControl> GetOrCreate(Type converttype, string setname, BindingFlags membersearchflags)
         {
-            /// <summary> Error string </summary>
-            public string ErrorString;
-            /// <summary> Property name causing the error, if applicable. Null otherwise</summary>
-            public string PropertyName;
-            /// <summary> Constructor </summary>
-            public ToObjectError(string s) { ErrorString = s; PropertyName = ""; }
-        };
+            lock (CacheOfTypesToMembers)        // thread lock
+            {
+                // try and find previously computed info
 
-        class AttrControl
-        {
-            public System.Reflection.MemberInfo MemberInfo; 
-            public bool CustomFormat;           // if custom format needs customconvert
+                var key = new Tuple<string, Type, BindingFlags>(setname, converttype, membersearchflags);
+
+                if (!CacheOfTypesToMembers.TryGetValue(key, out Dictionary<string, AttrControl> namestosettings))
+                {
+                    // System.Diagnostics.Debug.WriteLine($"Created cached control {key}");
+
+                    namestosettings = new Dictionary<string, AttrControl>();     // name -> MI, or name->Null if ignored
+
+                    CacheOfTypesToMembers[key] = namestosettings;
+
+                    var list = new List<System.Reflection.MemberInfo>();
+                    list.AddRange(converttype.GetFields(membersearchflags));        // get field list..
+                    list.AddRange(converttype.GetProperties(membersearchflags));        // get property list
+
+                    foreach (var mi in list)
+                    {
+                        bool includeit = true;
+
+                        // compute if to be ignored
+                        var calist = mi.GetCustomAttributes(typeof(JsonIgnoreAttribute), false);
+                        if (calist.Length == 1)
+                        {
+                            JsonIgnoreAttribute jia = calist[0] as JsonIgnoreAttribute;
+                            if (jia.Setting == null)       // null, means all sets
+                            {
+                                includeit = false;
+                            }
+                            else
+                            {
+                                for (int i = 0; i < jia.Setting.Length; i++)        // try and find the set, if found
+                                {
+                                    if (jia.Setting[i].Set.EqualsI(setname))        // found set, as long as its not an ignore/include list..
+                                    {
+                                        if (jia.Setting[i].Ignore == null && jia.Setting[i].IncludeOnly == null)
+                                            includeit = false;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        bool cf = false;
+                        var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
+                        if (customoutput.Length == 1)
+                        {
+                            JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
+                            if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                            {
+                                cf = true;
+                            }
+                        }
+
+                        var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
+                        if (renamelist.Length == 1)
+                        {
+                            JsonNameAttribute na = renamelist[0] as JsonNameAttribute;
+                            if (na.Sets == null)        // null, means all sets
+                            {
+                                foreach (var x in na.Names)
+                                    namestosettings[x] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf }; // add all names and point to mi
+                            }
+                            else
+                            {
+                                for (int i = 0; i < na.Sets.Length; i++)  // find set, if not found, no change, else add name to one accepted for this member
+                                {
+                                    if (na.Sets[i].EqualsI(setname))
+                                    {
+                                        namestosettings[na.Names[i]] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };     // we don't break, we can add multiple names with the sets matching more than once
+                                                                                                                                                        //System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            namestosettings[mi.Name] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };    // add the object name
+                                                                                                                                       //System.Diagnostics.Debug.WriteLine($"ToObjectType {mi.Name} {includeit}");
+                        }
+
+                    }
+                }
+                else
+                {
+                    //   System.Diagnostics.Debug.WriteLine($"Lookup cached control {key}");
+                }
+
+                return namestosettings;
+            }
         }
-
-        // cache
-        static Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>> CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
-
-        /// <summary> Clear ToObject convert cache </summary>
-        public static void ClearToObjectCache()
-        {
-            CacheOfTypesToMembers = new Dictionary<Tuple<string, Type>, Dictionary<string, AttrControl>>();
-        }
-
     }
 }
 

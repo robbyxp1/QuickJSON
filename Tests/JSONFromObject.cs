@@ -69,7 +69,7 @@ namespace JSONTests
             public string NotNull { get; set; }
 
             [JsonIgnoreAttribute(null, JsonIgnoreAttribute.Operation.Include, new string[] { "X", "Y", "Z" },
-                "S1", JsonIgnoreAttribute.Operation.Ignore, new string[] { "X" } )]      // default set only, knock out IsEmpty, second set, knock out X
+                "S1", JsonIgnoreAttribute.Operation.Ignore, new string[] { "X" })]      // default set only, knock out IsEmpty, second set, knock out X
             public Point3D Centre { get; set; }
 
             [JsonIgnore(JsonIgnoreAttribute.Operation.Ignore, "IsEmpty")]       // aookues ti default set only
@@ -92,7 +92,7 @@ namespace JSONTests
                 Name = name; ImagePathOrURL = path; Enabled = enabled; Centre = centre; Size = size; RotationDegrees = rotation;
                 RotateToViewer = rotviewer; RotateElevation = rotelevation; AlphaFadeScalar = alphafadescaler; AlphaFadePosition = alphafadepos;
             }
-       
+
         }
 
         public class Materials
@@ -166,7 +166,7 @@ namespace JSONTests
                 Check.That(list[0].RotationDegrees.Y).IsEqualTo(8);
                 Check.That(list[0].RotationDegrees.Z).IsEqualTo(9);
 
-                json = JToken.FromObjectWithError(ielist, false, membersearchflags: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance,setname:"S1").Array();
+                json = JToken.FromObjectWithError(ielist, false, membersearchflags: System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance, setname: "S1").Array();
                 System.Diagnostics.Debug.WriteLine($"Json: {json.ToString()}");
 
                 Check.That(json[0].Object().Contains("Enabled")).IsTrue();
@@ -448,14 +448,14 @@ namespace JSONTests
         public void JSONFromObjectCustomConvert()
         {
             {
-                var c1 = new CustomFromTest1() { v1 = Color.FromArgb(255,30,40,50), v2 = "kwkw", dt = DateTime.Now };
+                var c1 = new CustomFromTest1() { v1 = Color.FromArgb(255, 30, 40, 50), v2 = "kwkw", dt = DateTime.Now };
 
-                var jo = JToken.FromObject(c1,false,membersearchflags:System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.Public, 
+                var jo = JToken.FromObject(c1, false, membersearchflags: System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public,
                                 customconvert: (o) => { if (o is Color) return JToken.CreateToken(System.Drawing.ColorTranslator.ToHtml((Color)o)); else return JToken.CreateToken(o, false); });
                 Check.That(jo).IsNotNull();
                 Check.That(jo["v1"].Str()).IsEqualTo("#1E2832");
 
-                CustomFromTest1 c2 = jo.ToObject<CustomFromTest1>(customformat:(ty,o) => 
+                CustomFromTest1 c2 = jo.ToObject<CustomFromTest1>(customformat: (ty, o) =>
                 { return System.Drawing.ColorTranslator.FromHtml((string)o); });
                 Check.That(c1.v1).IsEqualTo(c2.v1);
             }
@@ -477,12 +477,14 @@ namespace JSONTests
             {
                 var c1 = new CustomFromTest2() { v1 = Color.FromArgb(255, 30, 40, 50), v2 = "kwkw", dt = DateTime.Now };
 
-                var jo = JToken.FromObject(c1, false, 
+                var jo = JToken.FromObject(c1, false,
                                 membersearchflags: System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public,
-                                setname:"Custom",
-                                customconvert: (o) => { 
+                                setname: "Custom",
+                                customconvert: (o) =>
+                                {
                                     if (o is Color) return JToken.CreateToken(System.Drawing.ColorTranslator.ToHtml((Color)o))
-                                        ; else return JToken.CreateToken(o, false); 
+                                        ;
+                                    else return JToken.CreateToken(o, false);
                                 });
 
                 Check.That(jo).IsNotNull();
@@ -491,7 +493,7 @@ namespace JSONTests
                 // not the right set
 
                 CustomFromTest2 c2 = jo.ToObject<CustomFromTest2>(customformat: (ty, o) =>
-                                                                        { return System.Drawing.ColorTranslator.FromHtml((string)o); }, setname:"Custom");
+                                                                        { return System.Drawing.ColorTranslator.FromHtml((string)o); }, setname: "Custom");
                 Check.That(c1.v1).IsEqualTo(c2.v1);
 
                 var jo2 = JToken.FromObject(c1, false,

@@ -37,6 +37,6 @@ namespace FrameworkSingleFile
                 Console.WriteLine($"Output : {sa1}");
             }
 
-        }
+         }
     }
 }

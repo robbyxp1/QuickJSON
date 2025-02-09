@@ -106,7 +106,8 @@ namespace QuickJSON
 
 /// <summary>
 /// Name attribute. Attach to an member of a class to indicate an alternate name to use in the JSON structure from its c# name.
-/// Applicable to FromObject and ToObject.  ToObject supports multiple names (any name in JSON will match this entry), FromObject only one.
+/// Applicable to FromObject and ToObject.  
+/// ToObject supports multiple names (any name in JSON will match this entry), FromObject only one and uses the first entry if multiple is given
 /// </summary>
 public sealed class JsonNameAttribute : Attribute
     {
@@ -131,7 +132,7 @@ public sealed class JsonNameAttribute : Attribute
     }
     /// <summary>
     /// Attach to a member to indicate if the value of it is null, don't add it to JSON.
-    /// FromObject only
+    /// Applicable to FromObject only
     /// </summary>
     public sealed class JsonIgnoreIfNullAttribute : Attribute
     {
@@ -146,7 +147,8 @@ public sealed class JsonNameAttribute : Attribute
 
     /// <summary>
     /// Attach to a member of a class to indicate a custom output/input call is needed
-    /// Must supply customformat callback
+    /// Applicable to FromObject and ToObject
+    /// Must supply a customformat callback to both From and To object if used.
     /// </summary>
     public sealed class JsonCustomFormat : Attribute
     {
@@ -156,6 +158,7 @@ public sealed class JsonNameAttribute : Attribute
 
         /// <summary> Constructor, applies to all sets </summary>
         public JsonCustomFormat() { Sets = null; }
+        /// <summary> Constructor with a list of sets to apply this to.</summary>
         public JsonCustomFormat(params string[] setnames) { Sets = setnames; }
     }
 

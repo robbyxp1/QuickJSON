@@ -21,7 +21,11 @@
     <RepositoryUrl>https://github.com/robbyxp1/QuickJSON</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
-    <PackageReleaseNotes>2.5
+    <PackageReleaseNotes>2.7
+Added JsonCustomFormat attribute to allow the caller to format the object into JSON and back.  
+Minor Fixes to ToObject/FromObject for set comparisons
+Split ToObject/FromObject each into an operating class to reduce parameters passed up and down the levels
+2.5
 FromObject now caches member info for speed.
 ToObject and FromObject attributes Json* now accept a set name allowing multiple configurations of json ignore, json name, json ignore if void
 to be created, and ToObject/FromObject allows the setname to be selected.  
@@ -72,9 +76,9 @@ Code can be XCOPYED into your project to avoid DLL dependencies.
 </Description>
     <Copyright>(C) robbyxp @ github.com  2020-2025</Copyright>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>2.5.0</Version>
-    <AssemblyVersion>2.5.0.0</AssemblyVersion>
-    <FileVersion>2.5.0.0</FileVersion>
+    <Version>2.7.0</Version>
+    <AssemblyVersion>2.7.0.0</AssemblyVersion>
+    <FileVersion>2.7.0.0</FileVersion>
     <Company>robbyxp @ github.com</Company>
   </PropertyGroup>
 

@@ -309,7 +309,7 @@ namespace QuickJSON
                 throw new NotImplementedException();
             else
             {
-                System.Diagnostics.Debug.WriteLine("Failed to serialise type " + obj.GetType().Name);
+                System.Diagnostics.Trace.WriteLine("QuickJSON Failed to serialise type " + obj.GetType().Name);
                 return null;
             }
         }
