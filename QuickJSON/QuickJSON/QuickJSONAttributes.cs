@@ -146,7 +146,7 @@ public sealed class JsonNameAttribute : Attribute
     }
 
     /// <summary>
-    /// Attach to a member of a class to indicate a custom output/input call is needed
+    /// Attach to a member of a class to indicate a custom output/input call is needed for the whole element.
     /// Applicable to FromObject and ToObject
     /// Must supply a customformat callback to both From and To object if used.
     /// </summary>
@@ -160,6 +160,23 @@ public sealed class JsonNameAttribute : Attribute
         public JsonCustomFormat() { Sets = null; }
         /// <summary> Constructor with a list of sets to apply this to.</summary>
         public JsonCustomFormat(params string[] setnames) { Sets = setnames; }
+    }
+
+    /// <summary>
+    /// Attach to a member of a class to indicate a custom output/input call is needed for each array member, not for the object itself
+    /// Applicable to FromObject and ToObject
+    /// Must supply a customformat callback to both From and To object if used.
+    /// </summary>
+    public sealed class JsonCustomFormatArray : Attribute
+    {
+        /// <summary> If non null, this belongs to an attribute set name to check.  If null, applies to all sets
+        /// Attribute sets allow selection of different outputs from the same class </summary>
+        public string[] Sets { get; set; }
+
+        /// <summary> Constructor, applies to all sets </summary>
+        public JsonCustomFormatArray() { Sets = null; }
+        /// <summary> Constructor with a list of sets to apply this to.</summary>
+        public JsonCustomFormatArray(params string[] setnames) { Sets = setnames; }
     }
 
 }

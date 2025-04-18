@@ -482,9 +482,10 @@ namespace JSONTests
                                 setname: "Custom",
                                 customconvert: (o) =>
                                 {
-                                    if (o is Color) return JToken.CreateToken(System.Drawing.ColorTranslator.ToHtml((Color)o))
-                                        ;
-                                    else return JToken.CreateToken(o, false);
+                                    if (o is Color)
+                                        return JToken.CreateToken(System.Drawing.ColorTranslator.ToHtml((Color)o));
+                                    else
+                                        return JToken.CreateToken(o, false);
                                 });
 
                 Check.That(jo).IsNotNull();
@@ -493,7 +494,7 @@ namespace JSONTests
                 // not the right set
 
                 CustomFromTest2 c2 = jo.ToObject<CustomFromTest2>(customformat: (ty, o) =>
-                                                                        { return System.Drawing.ColorTranslator.FromHtml((string)o); }, setname: "Custom");
+                { return System.Drawing.ColorTranslator.FromHtml((string)o); }, setname: "Custom");
                 Check.That(c1.v1).IsEqualTo(c2.v1);
 
                 var jo2 = JToken.FromObject(c1, false,
@@ -507,6 +508,48 @@ namespace JSONTests
             }
 
         }
+        class CustomFromTest3
+        {
+            [JsonCustomFormatArray("Custom")]
+            public Color[] v1;
+            public string v2;
+            public DateTime dt;
+        }
 
+
+        [Test]
+        public void JSONFromObjectCustomConvert3()      // DEMO sets using custom format with array elements 2.8
+        {
+            {
+                var c1 = new CustomFromTest3() { v1 = new Color[] { Color.FromArgb(255, 30, 40, 50), Color.Red }, v2 = "kwkw", dt = DateTime.Now };
+
+                var jo = JToken.FromObject(c1, false,
+                                membersearchflags: System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public,
+                                setname: "Custom",
+                                customconvert: (o) =>
+                                {
+                                    if (o is Color)
+                                        return JToken.CreateToken(System.Drawing.ColorTranslator.ToHtml((Color)o));
+                                    else
+                                        return JToken.CreateToken(o, false);
+                                });
+
+                Check.That(jo).IsNotNull();
+                Check.That(jo["v1"][0].Str()).IsEqualTo("#1E2832");
+                Check.That(jo["v1"][1].Str()).IsEqualTo("Red");
+
+                CustomFromTest3 c2 = jo.ToObject<CustomFromTest3>(customformat:
+                            (ty, o) =>
+                                { 
+                                    return System.Drawing.ColorTranslator.FromHtml((string)o); }, 
+                                    setname: "Custom");
+
+                Check.That(c2.v1[0]).IsEqualTo(c2.v1[0]);
+                Check.That(c2.v1[1]).IsEqualTo(c2.v1[1]);
+            }
+
+        }
+
+  
     }
 }

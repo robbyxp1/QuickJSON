@@ -47,7 +47,7 @@ namespace QuickJSON
             bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
         {
             FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconvert);
-            var r = cnv.Execute(obj, 0, null, null);
+            var r = cnv.Execute(obj, 0, null, null,false);
             System.Diagnostics.Debug.Assert(cnv.ObjectCount == 0);
             return r.IsInError ? null : r;
         }
@@ -67,7 +67,7 @@ namespace QuickJSON
             bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
         {
             FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconvert);
-            var r = cnv.Execute(obj, 0, null, null);
+            var r = cnv.Execute(obj, 0, null, null,false);
             System.Diagnostics.Debug.Assert(cnv.ObjectCount == 0);
             return r;
         }
@@ -84,11 +84,15 @@ namespace QuickJSON
             /// <summary>
             /// name to call the output
             /// </summary>
-            public string Name { get; set; } 
+            public string Name { get; set; }
             /// <summary>
             /// if custom format is active
             /// </summary>
             public bool CustomFormat { get; set; }
+            /// <summary>
+            /// if custom format is active for array elements, not the object itself
+            /// </summary>
+            public bool CustomFormatArray { get; set; }
             /// <summary>
             /// ignore member if null
             /// </summary>
@@ -156,7 +160,7 @@ namespace QuickJSON
             this.objectlist = new Stack<object>();
         }
 
-        public JToken Execute(Object o, int lvl, HashSet<string> memberignore, HashSet<string> memberinclude)
+        public JToken Execute(Object o, int lvl, HashSet<string> memberignore, HashSet<string> memberinclude, bool forcecustom)
         {
             if (lvl >= maxrecursiondepth)
                 return new JToken();        // returns NULL
@@ -182,7 +186,7 @@ namespace QuickJSON
                         return new JToken(JToken.TType.Error, "Self Reference in IDictionary");
                     }
 
-                    JToken inner = Execute(kvp.Value, lvl + 1, null, null);
+                    JToken inner = Execute(kvp.Value, lvl + 1, null, null, forcecustom);    // call execute on each element, passing down if we want a forcecustom convert
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -201,9 +205,10 @@ namespace QuickJSON
                 objectlist.Pop();
                 return outobj;
             }
-            else if (o is string)           // strings look like classes, so need to intercept first
+            else if (o is string)           // strings look like classes and IEnumerables, so intercept here
             {
-                var r = JToken.CreateToken(o, false);        // return token or null indicating unserializable
+                // return token or null indicating unserializable, allow for custom on strings in arrays
+                var r = forcecustom ? customconvert(o) : JToken.CreateToken(o, false);        
                 return r ?? new JToken(JToken.TType.Error, "Unserializable " + tt.Name);
             }
             else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(tt))       // enumerables, arrays, lists, hashsets
@@ -222,7 +227,7 @@ namespace QuickJSON
                         return new JToken(JToken.TType.Error, "Self Reference in IEnumerable");
                     }
 
-                    JToken inner = Execute(oa, lvl + 1, null, null);
+                    JToken inner = Execute(oa, lvl + 1, null, null, forcecustom);   // call execute on each element, passing down if we want a forcecustom convert
 
                     if (inner.IsInError)      // used as an error type
                     {
@@ -235,6 +240,10 @@ namespace QuickJSON
 
                 objectlist.Pop();
                 return outarray;
+            }
+            else if (forcecustom)           // else its an object, not an array, not a string, and if we have forced a custom convert on it, do it
+            {
+                return customconvert(o);
             }
             else if (tt.IsClass ||                                     // if class
                       (tt.IsValueType && !tt.IsPrimitive && !tt.IsEnum && tt != typeof(DateTime))     // if value type, not primitive, not enum, its a structure. Not datetime (handled in CreateToken)
@@ -321,7 +330,7 @@ namespace QuickJSON
                         }
 
                         var token = actrl.CustomFormat ? customconvert(innervalue) :
-                                    Execute(innervalue, lvl + 1, actrl.IgnoreSet, actrl.IncludeSet);
+                                    Execute(innervalue, lvl + 1, actrl.IgnoreSet, actrl.IncludeSet, actrl.CustomFormatArray);
 
                         if (token.IsInError)
                         {
@@ -444,6 +453,7 @@ namespace QuickJSON
                                 }
 
                                 // check on null attribute output flag
+
                                 var ignorenulllist = mi.GetCustomAttributes(typeof(JsonIgnoreIfNullAttribute), false);
                                 if (ignorenulllist.Length == 1)
                                 {
@@ -465,6 +475,8 @@ namespace QuickJSON
                                     }
                                 }
 
+                                // Custom format means the element is totally processed externally
+
                                 var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
                                 if (customoutput.Length == 1)
                                 {
@@ -472,6 +484,18 @@ namespace QuickJSON
                                     if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
                                     {
                                         ac.CustomFormat = true;
+                                    }
+                                }
+
+                                // Custom format Array means the element array elements are totally processed externally
+
+                                var customoutputarray = mi.GetCustomAttributes(typeof(JsonCustomFormatArray), false);
+                                if (customoutputarray.Length == 1)
+                                {
+                                    JsonCustomFormatArray jcf = customoutputarray[0] as JsonCustomFormatArray;
+                                    if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                    {
+                                        ac.CustomFormatArray = true;
                                     }
                                 }
 

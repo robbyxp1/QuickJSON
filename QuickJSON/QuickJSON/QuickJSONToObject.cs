@@ -54,7 +54,7 @@ namespace QuickJSON
             {
                 ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static, 
                                                                 process, customformat, setname);
-                Object ret = cnv.Execute(token, typeof(T), null);
+                Object ret = cnv.Execute(token, typeof(T), null, false);
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -93,7 +93,7 @@ namespace QuickJSON
             try
             {
                 ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
-                return cnv.Execute(token, converttype, initialobject);
+                return cnv.Execute(token, converttype, initialobject, false);
             }
             catch (Exception ex)
             {
@@ -126,7 +126,7 @@ namespace QuickJSON
             )
         {
             ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
-            return cnv.Execute(token, converttype, initialobject);
+            return cnv.Execute(token, converttype, initialobject, false);
         }
 
         /// <summary> Class to hold an conversion error </summary>
@@ -155,7 +155,8 @@ namespace QuickJSON
         public class AttrControl
         {
             public MemberInfo MemberInfo;       // null if not to include this json name information into the object, else the member to set.
-            public bool CustomFormat;           // if custom format call should be used to convert it
+            public bool CustomFormat;           // if custom format call the customformat should be used to convert the whole object
+            public bool CustomFormatArray;      // if custom format array the array elements the customformat call should be used to convert it
         }
 
         static public Dictionary<Tuple<string, Type, BindingFlags>, Dictionary<string, AttrControl>> CacheOfTypesToMembers =
@@ -164,20 +165,22 @@ namespace QuickJSON
         private bool ignoretypeerrors;
         private BindingFlags membersearchflags;
         private Func<Type, string, object> process;
-        private Func<Type, object, object> customformat;
+        private Func<Type, object, object> custcomconvert;
         private string setname;
 
         public ToObjectConverter(bool ignoretypeerrors, BindingFlags membersearchflags, Func<Type, string, object> process,
-                                    Func<Type, object, object> customformat, string setname)
+                                    Func<Type, object, object> customconvert, string setname)
         {
             this.ignoretypeerrors = ignoretypeerrors;
             this.membersearchflags = membersearchflags;
             this.process = process;
-            this.customformat = customformat;
+            this.custcomconvert = customconvert;
             this.setname = setname;
         }
 
-        public Object Execute(JToken token, Type converttype, Object initialobject)
+        // execute with this token, and to this converrtpe.  Give the initialobject, which can be null to make it
+        // forcecustom means for token.IsArray pass it thru to the element converters, and in the element converters, call convertcustom
+        public Object Execute(JToken token, Type converttype, Object initialobject, bool forcecustom)
         {
             if (token == null)
             {
@@ -197,7 +200,7 @@ namespace QuickJSON
                         {
                             // get the underlying element, must match array element type
 
-                            Object ret = Execute(token[i], converttype.GetElementType(), null);
+                            Object ret = Execute(token[i], converttype.GetElementType(), null, forcecustom);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
                             {
@@ -213,7 +216,7 @@ namespace QuickJSON
 
                         return instance;
                     }
-                    else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(converttype))      // else anything which is enumerable can be handled
+                    else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(converttype))      // else anything which is enumerable can be handled by add
                     {
                         dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the List
                         var types = converttype.GetGenericArguments();
@@ -221,7 +224,7 @@ namespace QuickJSON
                         for (int i = 0; i < token.Count; i++)
                         {
                             // get the underlying element, must match types[0] which is list type
-                            Object ret = Execute(token[i], types[0], null);
+                            Object ret = Execute(token[i], types[0], null, forcecustom);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
                             {
@@ -257,7 +260,7 @@ namespace QuickJSON
                     {
                         // get the value as the dictionary type - it must match type or it get OE
 
-                        Object ret = Execute(kvp.Value, types[1], null);
+                        Object ret = Execute(kvp.Value, types[1], null, false);
 
                         if (ret != null && ret.GetType() == typeof(ToObjectError))
                         {
@@ -314,17 +317,24 @@ namespace QuickJSON
                                         name = otype.GenericTypeArguments[0].Name;    // get 
                                 }
 
-                                if (tk.IsArray || tk.IsObject)
+                                if (tk.IsArray)
                                 {
-                                    // complex, ToObject it, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = Execute(kvp.Value, otype, null);
+                                    Object ret = Execute(kvp.Value, otype, null, ac.CustomFormatArray); // arrays can have custom force on, so the elements are custom converted
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
                                 }
-                                else if (ac.CustomFormat)
+                                else if ( tk.IsObject)
                                 {
-                                    Object p = customformat(otype, tk.Value);
+                                    // complex, ToObject it, return ret, either null (good) or value or ToObjectError (bad)
+                                    Object ret = Execute(kvp.Value, otype, null, false);
+                                    success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
+                                    if (success)      // if good, set 
+                                        success = mi.SetValue(instance, ret);
+                                }
+                                else if (ac.CustomFormat)               // if this is marked as custom, convert the whole object as custom
+                                {
+                                    Object p = custcomconvert(otype, tk.Value);
 
                                     if (p != null && p.GetType() != typeof(ToObjectError))  // if good, and not error, try set
                                         success = mi.SetValue(instance, p);
@@ -434,7 +444,7 @@ namespace QuickJSON
                                 else
                                 {
                                     // other complex, ToObject it, prob an enum, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = Execute(kvp.Value, otype, null);
+                                    Object ret = Execute(kvp.Value, otype, null, false);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -484,8 +494,14 @@ namespace QuickJSON
 
                 try
                 {
-                    if (process != null)
+                    if (process != null)        // if enum processor, do it
+                    {
                         return process(converttype, (string)token.Value);
+                    }
+                    else if (forcecustom)       // if force custom on it, do it
+                    {
+                        return custcomconvert(converttype, token.Value);
+                    }
                     else
                     {
                         //System.Diagnostics.Trace.WriteLine($"JSON ToObject enum convert {converttype.Name} from {Environment.StackTrace}");
@@ -515,7 +531,11 @@ namespace QuickJSON
 
                 // now check type
 
-                if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
+                if ( forcecustom )                                      // if custom convert is forced, do it
+                {
+                    return custcomconvert(converttype, token.Value);
+                }
+                else if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                 {
                     if (tk.IsNull)
                         return null;
@@ -657,14 +677,34 @@ namespace QuickJSON
                             }
                         }
 
-                        bool cf = false;
-                        var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
-                        if (customoutput.Length == 1)
+                        var ac = new AttrControl();     // member info = null, therefore default is ignore.
+
+                        if (includeit)      // only worth doing this if we are including it
                         {
-                            JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
-                            if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                            ac.MemberInfo = mi;
+
+                            // Custom format means the element is totally processed externally
+
+                            var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
+                            if (customoutput.Length == 1)
                             {
-                                cf = true;
+                                JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
+                                if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                {
+                                    ac.CustomFormat = true;
+                                }
+                            }
+
+                            // Custom format Array means the element array elements are totally processed externally
+
+                            var customoutputarray = mi.GetCustomAttributes(typeof(JsonCustomFormatArray), false);
+                            if (customoutputarray.Length == 1)
+                            {
+                                JsonCustomFormatArray jcf = customoutputarray[0] as JsonCustomFormatArray;
+                                if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                {
+                                    ac.CustomFormatArray = true;
+                                }
                             }
                         }
 
@@ -674,8 +714,9 @@ namespace QuickJSON
                             JsonNameAttribute na = renamelist[0] as JsonNameAttribute;
                             if (na.Sets == null)        // null, means all sets
                             {
+                                // add all names and all point to ac
                                 foreach (var x in na.Names)
-                                    namestosettings[x] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf }; // add all names and point to mi
+                                    namestosettings[x] = ac;
                             }
                             else
                             {
@@ -683,18 +724,17 @@ namespace QuickJSON
                                 {
                                     if (na.Sets[i].EqualsI(setname))
                                     {
-                                        namestosettings[na.Names[i]] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };     // we don't break, we can add multiple names with the sets matching more than once
-                                                                                                                                                        //System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
+                                        // add all names to point to access control 
+                                        namestosettings[na.Names[i]] = ac;
+                                        //System.Diagnostics.Debug.WriteLine($"ToObjectType NameList {na.Names[i]} -> {mi.Name} {includeit}");
                                     }
                                 }
                             }
                         }
                         else
                         {
-                            namestosettings[mi.Name] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };    // add the object name
-                                                                                                                                       //System.Diagnostics.Debug.WriteLine($"ToObjectType {mi.Name} {includeit}");
+                            namestosettings[mi.Name] = ac;
                         }
-
                     }
                 }
                 else
