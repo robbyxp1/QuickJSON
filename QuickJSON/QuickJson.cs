@@ -698,6 +698,12 @@ public sealed class JsonNameAttribute : Attribute
         public JsonCustomFormat() { Sets = null; }
         public JsonCustomFormat(params string[] setnames) { Sets = setnames; }
     }
+    public sealed class JsonCustomFormatArray : Attribute
+    {
+        public string[] Sets { get; set; }
+        public JsonCustomFormatArray() { Sets = null; }
+        public JsonCustomFormatArray(params string[] setnames) { Sets = setnames; }
+    }
 }
 namespace QuickJSON
 {
@@ -1271,7 +1277,7 @@ namespace QuickJSON
             bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
         {
             FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconvert);
-            var r = cnv.Execute(obj, 0, null, null);
+            var r = cnv.Execute(obj, 0, null, null,false);
             System.Diagnostics.Debug.Assert(cnv.ObjectCount == 0);
             return r.IsInError ? null : r;
         }
@@ -1280,7 +1286,7 @@ namespace QuickJSON
             bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
         {
             FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconvert);
-            var r = cnv.Execute(obj, 0, null, null);
+            var r = cnv.Execute(obj, 0, null, null,false);
             System.Diagnostics.Debug.Assert(cnv.ObjectCount == 0);
             return r;
         }
@@ -1288,8 +1294,9 @@ namespace QuickJSON
         public class MemberAttributeSettings
         {
             public MemberInfo MemberInfo;
-            public string Name { get; set; } 
+            public string Name { get; set; }
             public bool CustomFormat { get; set; }
+            public bool CustomFormatArray { get; set; }
             public bool IgnoreMemberIfNull { get; set; }     
             public HashSet<string> IncludeSet { get; set; }  
             public HashSet<string> IgnoreSet { get; set; }   
@@ -1330,7 +1337,7 @@ namespace QuickJSON
             this.customconvert = customconvert;
             this.objectlist = new Stack<object>();
         }
-        public JToken Execute(Object o, int lvl, HashSet<string> memberignore, HashSet<string> memberinclude)
+        public JToken Execute(Object o, int lvl, HashSet<string> memberignore, HashSet<string> memberinclude, bool forcecustom)
         {
             if (lvl >= maxrecursiondepth)
                 return new JToken();        // returns NULL
@@ -1349,7 +1356,7 @@ namespace QuickJSON
                         objectlist.Pop();
                         return new JToken(JToken.TType.Error, "Self Reference in IDictionary");
                     }
-                    JToken inner = Execute(kvp.Value, lvl + 1, null, null);
+                    JToken inner = Execute(kvp.Value, lvl + 1, null, null, forcecustom);    // call execute on each element, passing down if we want a forcecustom convert
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -1366,9 +1373,9 @@ namespace QuickJSON
                 objectlist.Pop();
                 return outobj;
             }
-            else if (o is string)           // strings look like classes, so need to intercept first
+            else if (o is string)           // strings look like classes and IEnumerables, so intercept here
             {
-                var r = JToken.CreateToken(o, false);        // return token or null indicating unserializable
+                var r = forcecustom ? customconvert(o) : JToken.CreateToken(o, false);        
                 return r ?? new JToken(JToken.TType.Error, "Unserializable " + tt.Name);
             }
             else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(tt))       // enumerables, arrays, lists, hashsets
@@ -1383,7 +1390,7 @@ namespace QuickJSON
                         objectlist.Pop();
                         return new JToken(JToken.TType.Error, "Self Reference in IEnumerable");
                     }
-                    JToken inner = Execute(oa, lvl + 1, null, null);
+                    JToken inner = Execute(oa, lvl + 1, null, null, forcecustom);   // call execute on each element, passing down if we want a forcecustom convert
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -1393,6 +1400,10 @@ namespace QuickJSON
                 }
                 objectlist.Pop();
                 return outarray;
+            }
+            else if (forcecustom)           // else its an object, not an array, not a string, and if we have forced a custom convert on it, do it
+            {
+                return customconvert(o);
             }
             else if (tt.IsClass ||                                     // if class
                       (tt.IsValueType && !tt.IsPrimitive && !tt.IsEnum && tt != typeof(DateTime))     // if value type, not primitive, not enum, its a structure. Not datetime (handled in CreateToken)
@@ -1454,7 +1465,7 @@ namespace QuickJSON
                             return new JToken(JToken.TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
                         var token = actrl.CustomFormat ? customconvert(innervalue) :
-                                    Execute(innervalue, lvl + 1, actrl.IgnoreSet, actrl.IncludeSet);
+                                    Execute(innervalue, lvl + 1, actrl.IgnoreSet, actrl.IncludeSet, actrl.CustomFormatArray);
                         if (token.IsInError)
                         {
                             if (!ignoreunserialisable)
@@ -1572,6 +1583,15 @@ namespace QuickJSON
                                     if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
                                     {
                                         ac.CustomFormat = true;
+                                    }
+                                }
+                                var customoutputarray = mi.GetCustomAttributes(typeof(JsonCustomFormatArray), false);
+                                if (customoutputarray.Length == 1)
+                                {
+                                    JsonCustomFormatArray jcf = customoutputarray[0] as JsonCustomFormatArray;
+                                    if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                    {
+                                        ac.CustomFormatArray = true;
                                     }
                                 }
                                 namestosettings[mi.Name] = ac;      // and store, we will process this
@@ -2414,7 +2434,7 @@ namespace QuickJSON
             {
                 ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static, 
                                                                 process, customformat, setname);
-                Object ret = cnv.Execute(token, typeof(T), null);
+                Object ret = cnv.Execute(token, typeof(T), null, false);
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -2440,7 +2460,7 @@ namespace QuickJSON
             try
             {
                 ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
-                return cnv.Execute(token, converttype, initialobject);
+                return cnv.Execute(token, converttype, initialobject, false);
             }
             catch (Exception ex)
             {
@@ -2457,7 +2477,7 @@ namespace QuickJSON
             )
         {
             ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
-            return cnv.Execute(token, converttype, initialobject);
+            return cnv.Execute(token, converttype, initialobject, false);
         }
         public class ToObjectError
         {
@@ -2475,25 +2495,26 @@ namespace QuickJSON
         public class AttrControl
         {
             public MemberInfo MemberInfo;       // null if not to include this json name information into the object, else the member to set.
-            public bool CustomFormat;           // if custom format call should be used to convert it
+            public bool CustomFormat;           // if custom format call the customformat should be used to convert the whole object
+            public bool CustomFormatArray;      // if custom format array the array elements the customformat call should be used to convert it
         }
         static public Dictionary<Tuple<string, Type, BindingFlags>, Dictionary<string, AttrControl>> CacheOfTypesToMembers =
                     new Dictionary<Tuple<string, Type,BindingFlags>, Dictionary<string, AttrControl>>();
         private bool ignoretypeerrors;
         private BindingFlags membersearchflags;
         private Func<Type, string, object> process;
-        private Func<Type, object, object> customformat;
+        private Func<Type, object, object> custcomconvert;
         private string setname;
         public ToObjectConverter(bool ignoretypeerrors, BindingFlags membersearchflags, Func<Type, string, object> process,
-                                    Func<Type, object, object> customformat, string setname)
+                                    Func<Type, object, object> customconvert, string setname)
         {
             this.ignoretypeerrors = ignoretypeerrors;
             this.membersearchflags = membersearchflags;
             this.process = process;
-            this.customformat = customformat;
+            this.custcomconvert = customconvert;
             this.setname = setname;
         }
-        public Object Execute(JToken token, Type converttype, Object initialobject)
+        public Object Execute(JToken token, Type converttype, Object initialobject, bool forcecustom)
         {
             if (token == null)
             {
@@ -2509,7 +2530,7 @@ namespace QuickJSON
                         dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, token.Count);   // dynamic holder for instance of array[]
                         for (int i = 0; i < token.Count; i++)
                         {
-                            Object ret = Execute(token[i], converttype.GetElementType(), null);
+                            Object ret = Execute(token[i], converttype.GetElementType(), null, forcecustom);
                             if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
                             {
                                 ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
@@ -2523,13 +2544,13 @@ namespace QuickJSON
                         }
                         return instance;
                     }
-                    else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(converttype))      // else anything which is enumerable can be handled
+                    else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(converttype))      // else anything which is enumerable can be handled by add
                     {
                         dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype);        // create the List
                         var types = converttype.GetGenericArguments();
                         for (int i = 0; i < token.Count; i++)
                         {
-                            Object ret = Execute(token[i], types[0], null);
+                            Object ret = Execute(token[i], types[0], null, forcecustom);
                             if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
                             {
                                 ((ToObjectError)ret).PropertyName = converttype.Name + "." + i.ToString() + "." + ((ToObjectError)ret).PropertyName;
@@ -2559,7 +2580,7 @@ namespace QuickJSON
                     var types = converttype.GetGenericArguments();
                     foreach (var kvp in (JObject)token)
                     {
-                        Object ret = Execute(kvp.Value, types[1], null);
+                        Object ret = Execute(kvp.Value, types[1], null, false);
                         if (ret != null && ret.GetType() == typeof(ToObjectError))
                         {
                             ((ToObjectError)ret).PropertyName = converttype.Name + "." + kvp.Key + "." + ((ToObjectError)ret).PropertyName;
@@ -2602,16 +2623,23 @@ namespace QuickJSON
                                     if (!tk.IsNull)         // if not null, then get underlying type.. and store in name. If null, its a null and below will set it to null
                                         name = otype.GenericTypeArguments[0].Name;    // get 
                                 }
-                                if (tk.IsArray || tk.IsObject)
+                                if (tk.IsArray)
                                 {
-                                    Object ret = Execute(kvp.Value, otype, null);
+                                    Object ret = Execute(kvp.Value, otype, null, ac.CustomFormatArray); // arrays can have custom force on, so the elements are custom converted
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
                                 }
-                                else if (ac.CustomFormat)
+                                else if ( tk.IsObject)
                                 {
-                                    Object p = customformat(otype, tk.Value);
+                                    Object ret = Execute(kvp.Value, otype, null, false);
+                                    success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
+                                    if (success)      // if good, set 
+                                        success = mi.SetValue(instance, ret);
+                                }
+                                else if (ac.CustomFormat)               // if this is marked as custom, convert the whole object as custom
+                                {
+                                    Object p = custcomconvert(otype, tk.Value);
                                     if (p != null && p.GetType() != typeof(ToObjectError))  // if good, and not error, try set
                                         success = mi.SetValue(instance, p);
                                 }
@@ -2717,7 +2745,7 @@ namespace QuickJSON
                                 }
                                 else
                                 {
-                                    Object ret = Execute(kvp.Value, otype, null);
+                                    Object ret = Execute(kvp.Value, otype, null, false);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -2760,8 +2788,14 @@ namespace QuickJSON
                 }
                 try
                 {
-                    if (process != null)
+                    if (process != null)        // if enum processor, do it
+                    {
                         return process(converttype, (string)token.Value);
+                    }
+                    else if (forcecustom)       // if force custom on it, do it
+                    {
+                        return custcomconvert(converttype, token.Value);
+                    }
                     else
                     {
                         return Enum.Parse(converttype, (string)token.Value, true);
@@ -2784,7 +2818,11 @@ namespace QuickJSON
                         return null;
                     name = converttype.GenericTypeArguments[0].Name;    // get underlying type.. and store in name
                 }
-                if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
+                if ( forcecustom )                                      // if custom convert is forced, do it
+                {
+                    return custcomconvert(converttype, token.Value);
+                }
+                else if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                 {
                     if (tk.IsNull)
                         return null;
@@ -2912,14 +2950,27 @@ namespace QuickJSON
                                 }
                             }
                         }
-                        bool cf = false;
-                        var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
-                        if (customoutput.Length == 1)
+                        var ac = new AttrControl();     // member info = null, therefore default is ignore.
+                        if (includeit)      // only worth doing this if we are including it
                         {
-                            JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
-                            if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                            ac.MemberInfo = mi;
+                            var customoutput = mi.GetCustomAttributes(typeof(JsonCustomFormat), false);
+                            if (customoutput.Length == 1)
                             {
-                                cf = true;
+                                JsonCustomFormat jcf = customoutput[0] as JsonCustomFormat;
+                                if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                {
+                                    ac.CustomFormat = true;
+                                }
+                            }
+                            var customoutputarray = mi.GetCustomAttributes(typeof(JsonCustomFormatArray), false);
+                            if (customoutputarray.Length == 1)
+                            {
+                                JsonCustomFormatArray jcf = customoutputarray[0] as JsonCustomFormatArray;
+                                if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
+                                {
+                                    ac.CustomFormatArray = true;
+                                }
                             }
                         }
                         var renamelist = mi.GetCustomAttributes(typeof(JsonNameAttribute), false);
@@ -2929,7 +2980,7 @@ namespace QuickJSON
                             if (na.Sets == null)        // null, means all sets
                             {
                                 foreach (var x in na.Names)
-                                    namestosettings[x] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf }; // add all names and point to mi
+                                    namestosettings[x] = ac;
                             }
                             else
                             {
@@ -2937,14 +2988,14 @@ namespace QuickJSON
                                 {
                                     if (na.Sets[i].EqualsI(setname))
                                     {
-                                        namestosettings[na.Names[i]] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };     // we don't break, we can add multiple names with the sets matching more than once
+                                        namestosettings[na.Names[i]] = ac;
                                     }
                                 }
                             }
                         }
                         else
                         {
-                            namestosettings[mi.Name] = new AttrControl() { MemberInfo = includeit ? mi : null, CustomFormat = cf };    // add the object name
+                            namestosettings[mi.Name] = ac;
                         }
                     }
                 }

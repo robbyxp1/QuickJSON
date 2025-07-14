@@ -43,17 +43,17 @@ namespace QuickJSON
         /// <param name="ignoretypeerrors">Ignore any errors in type between the JToken type and the member type.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
-        /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
+        /// <param name="customconverter">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>New object T containing fields filled by JToken, or default(T) on error. </returns>
         public static T ToObject<T>(this JToken token, bool ignoretypeerrors = false,
                                         Func<Type, string, object> process = null,
                                         string setname = null,
-                                        Func<Type, object, object> customformat = null)
+                                        Func<MemberInfo, object, object> customconverter = null)
         {
             try
             {
                 ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static, 
-                                                                process, customformat, setname);
+                                                                process, customconverter, setname);
                 Object ret = cnv.Execute(token, typeof(T), null, false);
                 if (ret is ToObjectError)
                 {
@@ -79,7 +79,7 @@ namespace QuickJSON
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime.</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
-        /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
+        /// <param name="customconverter">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
 
         public static Object ToObjectProtected(this JToken token, Type converttype, bool ignoretypeerrors,
@@ -87,12 +87,12 @@ namespace QuickJSON
                                     Object initialobject = null,
                                     Func<Type, string, object> process = null,
                                     string setname = null,
-                                    Func<Type, object, object> customformat = null
+                                    Func<MemberInfo, object, object> customconverter = null
                                     )
         {
             try
             {
-                ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
+                ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customconverter, setname);
                 return cnv.Execute(token, converttype, initialobject, false);
             }
             catch (Exception ex)
@@ -112,7 +112,7 @@ namespace QuickJSON
         /// <param name="initialobject">If null, object is newed. If given, start from this object. Will except if it and the converttype is not compatible.</param>
         /// <param name="process">For enums and datetime, and if set, process and return enum or DateTime</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
-        /// <param name="customformat">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
+        /// <param name="customconverter">Class members convert to object using this function if marked with [JsonCustomFormat]</param>
         /// <returns>Object containing fields filled by JToken, or a object of ToObjectError on named error, or null if no tokens</returns>
         /// <exception cref="System.Exception"> Generic exception</exception>
         /// <exception cref="System.InvalidCastException"> If a type failure occurs.  Other excepections could also occur.
@@ -122,10 +122,10 @@ namespace QuickJSON
             Object initialobject = null,
             Func<Type, string, object> process = null,
             string setname = null,
-            Func<Type, object, object> customformat = null
+            Func<MemberInfo, object, object> customconverter = null
             )
         {
-            ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customformat, setname);
+            ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customconverter, setname);
             return cnv.Execute(token, converttype, initialobject, false);
         }
 
@@ -165,16 +165,16 @@ namespace QuickJSON
         private bool ignoretypeerrors;
         private BindingFlags membersearchflags;
         private Func<Type, string, object> process;
-        private Func<Type, object, object> custcomconvert;
+        private Func<MemberInfo, object, object> customconvert;
         private string setname;
 
         public ToObjectConverter(bool ignoretypeerrors, BindingFlags membersearchflags, Func<Type, string, object> process,
-                                    Func<Type, object, object> customconvert, string setname)
+                                    Func<MemberInfo, object, object> customconvert, string setname)
         {
             this.ignoretypeerrors = ignoretypeerrors;
             this.membersearchflags = membersearchflags;
             this.process = process;
-            this.custcomconvert = customconvert;
+            this.customconvert = customconvert;
             this.setname = setname;
         }
 
@@ -334,7 +334,7 @@ namespace QuickJSON
                                 }
                                 else if (ac.CustomFormat)               // if this is marked as custom, convert the whole object as custom
                                 {
-                                    Object p = custcomconvert(otype, tk.Value);
+                                    Object p = customconvert(mi, tk.Value);
 
                                     if (p != null && p.GetType() != typeof(ToObjectError))  // if good, and not error, try set
                                         success = mi.SetValue(instance, p);
@@ -500,7 +500,7 @@ namespace QuickJSON
                     }
                     else if (forcecustom)       // if force custom on it, do it
                     {
-                        return custcomconvert(converttype, token.Value);
+                        return customconvert(converttype, token.Value);
                     }
                     else
                     {
@@ -533,7 +533,7 @@ namespace QuickJSON
 
                 if ( forcecustom )                                      // if custom convert is forced, do it
                 {
-                    return custcomconvert(converttype, token.Value);
+                    return customconvert(converttype, token.Value);
                 }
                 else if (name.Equals("String"))                              // copies of QuickJSON explicit operators in QuickJSON.cs
                 {

@@ -15,6 +15,7 @@
 using QuickJSON.Utils;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
@@ -40,14 +41,14 @@ namespace QuickJSON
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
-        /// <param name="customconvert">Use this custom converter on class members when they are marked with [JsonCustomFormat]n</param>
+        /// <param name="customconverter">Use this custom converter on class members when they are marked with [JsonCustomFormat]n</param>
         /// <returns>Null if can't convert (error detected) or JToken tree</returns>
         public static JToken FromObject(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
+            bool ignoreobjectpropertyifnull = false, string setname = null, Func<MemberInfo, Object, JToken> customconverter = null)
         {
-            FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconvert);
-            var r = cnv.Execute(obj, 0, null, null,false);
+            FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconverter);
+            var r = cnv.Execute(obj, 0, null, null,null);
             System.Diagnostics.Debug.Assert(cnv.ObjectCount == 0);
             return r.IsInError ? null : r;
         }
@@ -60,14 +61,14 @@ namespace QuickJSON
         /// <param name="membersearchflags">Member search flags, to select what types of members are serialised</param>
         /// <param name="ignoreobjectpropertyifnull">acts as per JSONIgnoreIfNull and does not output JSON object property null</param>
         /// <param name="setname">Define set of JSON attributes to apply, null for default</param>
-        /// <param name="customconvert">Use this custom converter on class members when they are marked with [JsonCustomFormat]n</param>
+        /// <param name="customconverter">Use this custom converter on class members when they are marked with [JsonCustomFormat]n</param>
         /// <returns>JToken error type if can't convert (check with IsInError, value has error reason) or JToken tree</returns>
         public static JToken FromObjectWithError(Object obj, bool ignoreunserialisable, Type[] ignored = null, int maxrecursiondepth = 256, 
             System.Reflection.BindingFlags membersearchflags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static,
-            bool ignoreobjectpropertyifnull = false, string setname = null, Func<Object, JToken> customconvert = null)
+            bool ignoreobjectpropertyifnull = false, string setname = null, Func<MemberInfo, Object, JToken> customconverter = null)
         {
-            FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconvert);
-            var r = cnv.Execute(obj, 0, null, null,false);
+            FromObjectConverter cnv = new FromObjectConverter(ignoreunserialisable, ignored, maxrecursiondepth, membersearchflags, ignoreobjectpropertyifnull, setname, customconverter);
+            var r = cnv.Execute(obj, 0, null, null,null);
             System.Diagnostics.Debug.Assert(cnv.ObjectCount == 0);
             return r;
         }
@@ -140,7 +141,7 @@ namespace QuickJSON
         private BindingFlags membersearchflags;
         private bool ignoreobjectpropertyifnull;
         private string setname;
-        Func<Object, JToken> customconvert;
+        Func<MemberInfo, Object, JToken> customconvert;
 
         private Stack<Object> objectlist;   // holds the objects converted to check for recursion
 
@@ -148,7 +149,7 @@ namespace QuickJSON
 
         public FromObjectConverter(bool ignoreunserialisable, Type[] ignoredtypes, int maxrecursiondepth,
                                     BindingFlags membersearchflags, bool ignoreobjectpropertyifnull, string setname,
-                                    Func<Object, JToken> customconvert)
+                                    Func<MemberInfo, Object, JToken> customconvert)
         {
             this.ignoreunserialisable = ignoreunserialisable;
             this.ignoredtypes = ignoredtypes;
@@ -160,7 +161,7 @@ namespace QuickJSON
             this.objectlist = new Stack<object>();
         }
 
-        public JToken Execute(Object o, int lvl, HashSet<string> memberignore, HashSet<string> memberinclude, bool forcecustom)
+        public JToken Execute(Object o, int lvl, HashSet<string> memberignore, HashSet<string> memberinclude, MemberInfo forcecustommi = null)
         {
             if (lvl >= maxrecursiondepth)
                 return new JToken();        // returns NULL
@@ -186,7 +187,7 @@ namespace QuickJSON
                         return new JToken(JToken.TType.Error, "Self Reference in IDictionary");
                     }
 
-                    JToken inner = Execute(kvp.Value, lvl + 1, null, null, forcecustom);    // call execute on each element, passing down if we want a forcecustom convert
+                    JToken inner = Execute(kvp.Value, lvl + 1, null, null, forcecustommi);    // call execute on each element, passing down if we want a forcecustom convert
                     if (inner.IsInError)      // used as an error type
                     {
                         objectlist.Pop();
@@ -208,7 +209,7 @@ namespace QuickJSON
             else if (o is string)           // strings look like classes and IEnumerables, so intercept here
             {
                 // return token or null indicating unserializable, allow for custom on strings in arrays
-                var r = forcecustom ? customconvert(o) : JToken.CreateToken(o, false);        
+                var r = forcecustommi!=null ? customconvert(forcecustommi,o) : JToken.CreateToken(o, false);        
                 return r ?? new JToken(JToken.TType.Error, "Unserializable " + tt.Name);
             }
             else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(tt))       // enumerables, arrays, lists, hashsets
@@ -227,7 +228,7 @@ namespace QuickJSON
                         return new JToken(JToken.TType.Error, "Self Reference in IEnumerable");
                     }
 
-                    JToken inner = Execute(oa, lvl + 1, null, null, forcecustom);   // call execute on each element, passing down if we want a forcecustom convert
+                    JToken inner = Execute(oa, lvl + 1, null, null, forcecustommi);   // call execute on each element, passing down if we want a forcecustom convert
 
                     if (inner.IsInError)      // used as an error type
                     {
@@ -241,9 +242,9 @@ namespace QuickJSON
                 objectlist.Pop();
                 return outarray;
             }
-            else if (forcecustom)           // else its an object, not an array, not a string, and if we have forced a custom convert on it, do it
+            else if (forcecustommi!=null)           // else its an object, not an array, not a string, and if we have forced a custom convert on it, do it
             {
-                return customconvert(o);
+                return customconvert(forcecustommi, o);
             }
             else if (tt.IsClass ||                                     // if class
                       (tt.IsValueType && !tt.IsPrimitive && !tt.IsEnum && tt != typeof(DateTime))     // if value type, not primitive, not enum, its a structure. Not datetime (handled in CreateToken)
@@ -329,8 +330,9 @@ namespace QuickJSON
                             return new JToken(JToken.TType.Error, "Self Reference by " + tt.Name + ":" + mi.Name);
                         }
 
-                        var token = actrl.CustomFormat ? customconvert(innervalue) :
-                                    Execute(innervalue, lvl + 1, actrl.IgnoreSet, actrl.IncludeSet, actrl.CustomFormatArray);
+                        var token = actrl.CustomFormat ? customconvert(actrl.MemberInfo, innervalue) :
+                                    Execute(innervalue, lvl + 1, actrl.IgnoreSet, actrl.IncludeSet, 
+                                                    actrl.CustomFormatArray ? actrl.MemberInfo : null);     // here if its a custom format array, lets pass down the MI so it knows what its doing and flag to convert
 
                         if (token.IsInError)
                         {
