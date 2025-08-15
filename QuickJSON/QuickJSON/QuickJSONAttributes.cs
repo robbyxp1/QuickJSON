@@ -179,6 +179,24 @@ public sealed class JsonNameAttribute : Attribute
         public JsonCustomFormatArray(params string[] setnames) { Sets = setnames; }
     }
 
+    /// <summary>
+    /// Attach to a member of a class to indicate a custom minimum length of an array. If the data is longer, the array will be longer
+    /// Applicable to ToObject
+    /// </summary>
+    public sealed class JsonCustomArrayLength : Attribute
+    {
+        /// <summary> If non null, this belongs to an attribute set name to check.  If null, applies to all sets
+        /// Attribute sets allow selection of different outputs from the same class </summary>
+        public string[] Sets { get; set; }
+        /// <summary> Set to the minimum length </summary>
+        public int[] MinimumLength { get; set; }
+
+        /// <summary> Constructor, applies to all sets </summary>
+        public JsonCustomArrayLength(int minlen) { Sets = null; MinimumLength = new int[1] { minlen }; }
+        /// <summary> Constructor with a list of sets to apply this to.</summary>
+        public JsonCustomArrayLength(string[] setnames, int[] lengths) { Sets = setnames; MinimumLength = lengths; }
+    }
+
 }
 
 

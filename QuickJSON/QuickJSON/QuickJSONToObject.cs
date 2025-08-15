@@ -54,7 +54,7 @@ namespace QuickJSON
             {
                 ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static, 
                                                                 process, customconverter, setname);
-                Object ret = cnv.Execute(token, typeof(T), null, false);
+                Object ret = cnv.Execute(token, typeof(T), null, false,0);
                 if (ret is ToObjectError)
                 {
                     System.Diagnostics.Debug.WriteLine("JSON ToObject error:" + ((ToObjectError)ret).ErrorString + ":" + ((ToObjectError)ret).PropertyName);
@@ -93,7 +93,7 @@ namespace QuickJSON
             try
             {
                 ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customconverter, setname);
-                return cnv.Execute(token, converttype, initialobject, false);
+                return cnv.Execute(token, converttype, initialobject, false,0);
             }
             catch (Exception ex)
             {
@@ -126,7 +126,7 @@ namespace QuickJSON
             )
         {
             ToObjectConverter cnv = new ToObjectConverter(ignoretypeerrors, membersearchflags, process, customconverter, setname);
-            return cnv.Execute(token, converttype, initialobject, false);
+            return cnv.Execute(token, converttype, initialobject, false,0);
         }
 
         /// <summary> Class to hold an conversion error </summary>
@@ -157,6 +157,7 @@ namespace QuickJSON
             public MemberInfo MemberInfo;       // null if not to include this json name information into the object, else the member to set.
             public bool CustomFormat;           // if custom format call the customformat should be used to convert the whole object
             public bool CustomFormatArray;      // if custom format array the array elements the customformat call should be used to convert it
+            public int MinimumArrayLength;      // minimum array length to make
         }
 
         static public Dictionary<Tuple<string, Type, BindingFlags>, Dictionary<string, AttrControl>> CacheOfTypesToMembers =
@@ -180,7 +181,7 @@ namespace QuickJSON
 
         // execute with this token, and to this converrtpe.  Give the initialobject, which can be null to make it
         // forcecustom means for token.IsArray pass it thru to the element converters, and in the element converters, call convertcustom
-        public Object Execute(JToken token, Type converttype, Object initialobject, bool forcecustom)
+        public Object Execute(JToken token, Type converttype, Object initialobject, bool forcecustom, int minimumarraylength)
         {
             if (token == null)
             {
@@ -194,13 +195,14 @@ namespace QuickJSON
                 {
                     if (converttype.IsArray)        // need to handle arrays because it needs a defined length
                     {
-                        dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, token.Count);   // dynamic holder for instance of array[]
+                        // dynamic holder for instance of array[] with minimum length of either token.Count or minimumarraylength
+                        dynamic instance = initialobject != null ? initialobject : Activator.CreateInstance(converttype, Math.Max(token.Count, minimumarraylength));   
 
                         for (int i = 0; i < token.Count; i++)
                         {
                             // get the underlying element, must match array element type
 
-                            Object ret = Execute(token[i], converttype.GetElementType(), null, forcecustom);
+                            Object ret = Execute(token[i], converttype.GetElementType(), null, forcecustom,0);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))      // arrays must be full, any errors means an error
                             {
@@ -224,7 +226,7 @@ namespace QuickJSON
                         for (int i = 0; i < token.Count; i++)
                         {
                             // get the underlying element, must match types[0] which is list type
-                            Object ret = Execute(token[i], types[0], null, forcecustom);
+                            Object ret = Execute(token[i], types[0], null, forcecustom,0);
 
                             if (ret != null && ret.GetType() == typeof(ToObjectError))  // lists must be full, any errors are errors
                             {
@@ -260,7 +262,7 @@ namespace QuickJSON
                     {
                         // get the value as the dictionary type - it must match type or it get OE
 
-                        Object ret = Execute(kvp.Value, types[1], null, false);
+                        Object ret = Execute(kvp.Value, types[1], null, false, 0);
 
                         if (ret != null && ret.GetType() == typeof(ToObjectError))
                         {
@@ -319,7 +321,9 @@ namespace QuickJSON
 
                                 if (tk.IsArray)
                                 {
-                                    Object ret = Execute(kvp.Value, otype, null, ac.CustomFormatArray); // arrays can have custom force on, so the elements are custom converted
+                                    // arrays can have custom force on, so the elements are custom converted
+                                    // arrays can have a minimum length
+                                    Object ret = Execute(kvp.Value, otype, null, ac.CustomFormatArray, ac.MinimumArrayLength); 
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -327,7 +331,7 @@ namespace QuickJSON
                                 else if ( tk.IsObject)
                                 {
                                     // complex, ToObject it, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = Execute(kvp.Value, otype, null, false);
+                                    Object ret = Execute(kvp.Value, otype, null, false,0);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -444,7 +448,7 @@ namespace QuickJSON
                                 else
                                 {
                                     // other complex, ToObject it, prob an enum, return ret, either null (good) or value or ToObjectError (bad)
-                                    Object ret = Execute(kvp.Value, otype, null, false);
+                                    Object ret = Execute(kvp.Value, otype, null, false,0);
                                     success = ret == null || ret.GetType() != typeof(ToObjectError);    // is it a good conversion
                                     if (success)      // if good, set 
                                         success = mi.SetValue(instance, ret);
@@ -704,6 +708,22 @@ namespace QuickJSON
                                 if (jcf.Sets == null || jcf.Sets.Contains(setname, StringComparer.InvariantCulture))    // if matches
                                 {
                                     ac.CustomFormatArray = true;
+                                }
+                            }
+
+                            var customminimumarraylength = mi.GetCustomAttributes(typeof(JsonCustomArrayLength), false);
+                            if (customminimumarraylength.Length == 1)
+                            {
+                                JsonCustomArrayLength jcf = customminimumarraylength[0] as JsonCustomArrayLength;
+                                if (jcf.Sets == null)
+                                {
+                                    ac.MinimumArrayLength = jcf.MinimumLength[0];
+                                }
+                                else
+                                {
+                                    int indexof = Array.IndexOf(jcf.Sets, setname);     // see if set name defined, if so, pick up minimum length
+                                    if (indexof >= 0)
+                                        ac.MinimumArrayLength = jcf.MinimumLength[indexof];
                                 }
                             }
                         }

@@ -23,6 +23,7 @@
     <PackageTags>JSON QuickJSON Decoder Encoder</PackageTags>
     <PackageReleaseNotes>2.9 
 Changed signature of customconvert to pass back member info instead of type - this still gives you the type and also now the member name
+Add JsonCustomArrayLength
 2.8
 Added JsonCustomFormatArray attribute to allow the caller to format the object into JSON and back for each array element
 2.7
